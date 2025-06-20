@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poem Compiler Tool</title>
+    <style>
+        /* Add your CSS styles here if any, or link a separate stylesheet */
+        body { font-family: sans-serif; margin: 20px; }
+        .widget-notification { /* Basic notification styles */ }
+        .widget-notification-success { background-color: #28a745; }
+        .widget-notification-error { background-color: #dc3545; }
+        .widget-notification-warning { background-color: #ffc107; color: #333; }
+        .widget-notification-info { background-color: #17a2b8; }
+        #notificationContainer {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; display: flex; flex-direction: column; gap: 10px;
+            max-width: 90%; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>My Poem Compiler</h1>
+
+    <div id="compiler-tool">
+        <p>This is where your poem compiler UI would be.</p>
+        <button onclick="poemCompiler.showNotification('This is a test notification!', 'info');">Test Notification</button>
+        <button onclick="poemCompiler.downloadCombinedDocument();">Download Poems (After processing)</button>
+
+        <div id="download-status" aria-live="polite" class="sr-only"></div>
+    </div>
+
+    <div id="notificationContainer"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
