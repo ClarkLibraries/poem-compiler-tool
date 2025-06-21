@@ -48,7 +48,7 @@
         }
         .poem-item {
             list-style: none;
-            cursor: grab;
+            cursor: grab; /* Indicates draggable */
             margin-bottom: 0.75em;
             /* Tailwind classes already define much of this: */
             /* bg-white p-4 shadow-sm rounded-lg flex items-center justify-between transition-all duration-200 ease-in-out */
@@ -99,6 +99,21 @@
         }
         .modal-close-btn:hover {
             color: #333;
+        }
+        /* Styling for content within the modal - from Mammoth.js HTML */
+        #poemModalContent p {
+            margin-bottom: 0.5em;
+        }
+        #poemModalContent h1, #poemModalContent h2, #poemModalContent h3, #poemModalContent h4, #poemModalContent h5, #poemModalContent h6 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+        #poemModalContent ul, #poemModalContent ol {
+            margin-left: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        #poemModalContent li {
+            margin-bottom: 0.2em;
         }
     </style>
 </head>
