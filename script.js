@@ -26,7 +26,6 @@
 
             if (!wordFiles || !processBtn || !downloadBtn || !clearBtn || !fileLabel) {
                 console.error('Required DOM elements not found. Please ensure all IDs are correct in the HTML.');
-                // Attempt to display a user-friendly error if critical elements are missing
                 this.showNotification('Application setup error: Some UI elements are missing. Please check the HTML.', 'error', 0);
                 return;
             }
@@ -284,7 +283,6 @@
 
             progressContainer.style.display = 'none';
             processBtn.textContent = 'Process Documents';
-            // Re-enable if files are selected, otherwise keep disabled
             processBtn.disabled = this.selectedFiles.length === 0;
             this.isProcessing = false;
         }
@@ -296,8 +294,7 @@
             console.log('Resetting file input.');
             const wordFiles = document.getElementById('wordFiles');
             if (wordFiles) {
-                wordFiles.value = ''; // Clears the selected file(s) from the input
-                // Manually trigger handleFileSelect with empty files to reset the label
+                wordFiles.value = '';
                 this.handleFileSelect({ target: { files: [] } });
             }
         }
@@ -714,7 +711,6 @@
          * @returns {HTMLElement} The created poem div element.
          */
         createPoemElement(poem, index) {
-            // console.log(`Creating poem element for "${poem.title}" at index ${index}.`);
             const poemDiv = document.createElement('div');
             poemDiv.classList.add('widget-poem-item');
             poemDiv.setAttribute('draggable', 'true');
@@ -959,7 +955,7 @@
                 notificationDiv.classList.remove('opacity-0');
             }, 10);
 
-            if (duration > 0) { // Only set timeout if duration is positive
+            if (duration > 0) {
                 this.notificationTimeout = setTimeout(() => {
                     notificationDiv.classList.add('opacity-0');
                     notificationDiv.addEventListener('transitionend', () => {
@@ -1038,7 +1034,7 @@
             downloadBtn.disabled = true;
             const originalText = downloadBtn.textContent;
             downloadBtn.textContent = 'Generating...';
-            this.showNotification(`Generating ${exportFormat.toUpperCase()}...`, 'info', 0); // Indefinite until done
+            this.showNotification(`Generating ${exportFormat.toUpperCase()}...`, 'info', 0);
 
             try {
                 let filename = 'Combined_Poems';
@@ -1053,12 +1049,14 @@
                         filename += '.html';
                         break;
                     case 'docx':
-                        blob = new Blob([combinedHtml], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-                        filename += '.docx';
-                        this.showNotification('Downloading .docx. Please note: This is an HTML file saved as .docx for compatibility with Word. Formatting may vary.', 'info', 10000);
+                        // Changed MIME type and extension for better compatibility with Word for HTML content
+                        blob = new Blob([combinedHtml], { type: 'application/msword' });
+                        filename += '.doc'; // Use .doc extension
+                        this.showNotification('Downloading as .doc. This is an HTML file saved with a .doc extension for compatibility with Word. Formatting may vary. For full .docx features, open in Word and Save As .docx.', 'info', 10000);
                         break;
                     case 'pdf':
                         console.log('Generating PDF...');
+                        console.log('HTML content for PDF:', combinedHtml.substring(0, 500) + '...'); // Log first 500 chars
                         await this._generatePdfOutput(combinedHtml, filename);
                         this.showNotification('PDF generated!', 'success');
                         this.resetDownloadUI(downloadBtn, originalText);
@@ -1070,7 +1068,7 @@
                         return;
                 }
 
-                saveAs(blob, filename); // Uses FileSaver.js
+                saveAs(blob, filename);
                 this.showNotification('Document downloaded successfully!', 'success');
                 console.log(`File "${filename}" downloaded.`);
 
@@ -1093,7 +1091,7 @@
             downloadBtn.disabled = this.poems.length === 0;
             const notificationContainer = document.getElementById('notificationContainer');
             if (notificationContainer) {
-                notificationContainer.innerHTML = ''; // Clear indefinite notification
+                notificationContainer.innerHTML = '';
             }
         }
 
@@ -1232,9 +1230,12 @@
             tempDiv.innerHTML = htmlContent;
             tempDiv.style.width = '210mm';
             tempDiv.style.margin = '0 auto';
-            tempDiv.style.visibility = 'hidden';
+            tempDiv.style.visibility = 'hidden'; // Keep it hidden
             document.body.appendChild(tempDiv);
             console.log('Temporary div created and appended for PDF generation.');
+
+            // Add a small delay to ensure the browser has time to render content in tempDiv
+            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
 
             try {
                 await html2pdf().set(opt).from(tempDiv).save();
@@ -1252,3 +1253,4 @@
         new PoemCompiler();
     });
 })();
+
