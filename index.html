@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poem Compiler</title>
+    <title>Packet Compiler</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -46,14 +46,14 @@
         .file-upload-area small {
             color: #6b7280;
         }
-        .poem-item {
+        .packet-item {
             list-style: none;
             cursor: grab; /* Indicates draggable */
             margin-bottom: 0.75em;
             /* Tailwind classes already define much of this: */
             /* bg-white p-4 shadow-sm rounded-lg flex items-center justify-between transition-all duration-200 ease-in-out */
         }
-        .poem-item.dragging {
+        .packet-item.dragging {
             opacity: 0.5;
             border: 2px dashed #3b82f6;
             background-color: #e0f2fe;
@@ -101,25 +101,25 @@
             color: #333;
         }
         /* Styling for content within the modal - from Mammoth.js HTML */
-        #poemModalContent p {
+        #packetModalContent p {
             margin-bottom: 0.5em;
         }
-        #poemModalContent h1, #poemModalContent h2, #poemModalContent h3, #poemModalContent h4, #poemModalContent h5, #poemModalContent h6 {
+        #packetModalContent h1, #packetModalContent h2, #packetModalContent h3, #packetModalContent h4, #packetModalContent h5, #packetModalContent h6 {
             margin-top: 1em;
             margin-bottom: 0.5em;
         }
-        #poemModalContent ul, #poemModalContent ol {
+        #packetModalContent ul, #packetModalContent ol {
             margin-left: 1.5em;
             margin-bottom: 0.5em;
         }
-        #poemModalContent li {
+        #packetModalContent li {
             margin-bottom: 0.2em;
         }
     </style>
 </head>
 <body class="bg-gray-100 p-6">
     <div class="container bg-white p-8 rounded-lg shadow-xl">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Poem Compiler</h1>
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">packet Compiler</h1>
 
         <div class="mb-8">
             <label for="wordFiles" id="fileLabel" class="file-upload-area block text-blue-600 font-medium text-lg">
@@ -138,7 +138,7 @@
                 Download Combined HTML
             </button>
             <button id="clearBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                Clear All Poems
+                Clear All packets
             </button>
         </div>
 
@@ -148,22 +148,22 @@
             </div>
         </div>
 
-        <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Loaded Poems (<span id="poemCount">0</span>)</h2>
-        <p id="poemsPlaceholder" class="text-gray-500 text-center py-8">
-            No poems loaded yet. Upload and process Word documents to see them here!
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Loaded packets (<span id="packetCount">0</span>)</h2>
+        <p id="packetsPlaceholder" class="text-gray-500 text-center py-8">
+            No packets loaded yet. Upload and process Word documents to see them here!
         </p>
-        <ul id="poemsList" class="space-y-3">
+        <ul id="packetsList" class="space-y-3">
             </ul>
-        <p id="poem-list-status" class="sr-only" aria-live="polite"></p> </div>
+        <p id="packet-list-status" class="sr-only" aria-live="polite"></p> </div>
 
     <div id="notification" class="notification fixed bottom-4 right-4 p-3 rounded-md shadow-lg text-white opacity-0 transition-opacity duration-300 z-50">
         </div>
 
-    <div id="poemModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="poemModalTitle" aria-hidden="true">
+    <div id="packetModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="packetModalTitle" aria-hidden="true">
         <div class="modal-content">
-            <button id="closeModal" class="modal-close-btn" aria-label="Close poem view">&times;</button>
-            <h2 id="poemModalTitle" class="text-2xl font-bold mb-4 text-gray-800">Poem Title</h2>
-            <div id="poemModalContent" class="prose max-w-none">
+            <button id="closeModal" class="modal-close-btn" aria-label="Close packet view">&times;</button>
+            <h2 id="packetModalTitle" class="text-2xl font-bold mb-4 text-gray-800">packet Title</h2>
+            <div id="packetModalContent" class="prose max-w-none">
                 </div>
         </div>
     </div>
