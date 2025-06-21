@@ -1,14 +1,14 @@
 (function() {
     'use strict';
 
-    class PoemCompiler {
+    class PacketCompiler {
         constructor() {
-            this.poems = [];
+            this.packets = [];
             this.selectedFiles = [];
             this.draggedIndex = null;
             this.isProcessing = false;
             this.notificationTimeout = null;
-            console.log('PoemCompiler initialized.');
+            console.log('PacketCompiler initialized.');
             this.initializeEventListeners();
             this.updateDisplay();
         }
@@ -55,7 +55,7 @@
             // Clear button click event
             clearBtn.addEventListener('click', () => {
                 console.log('Clear button clicked.');
-                this.clearAllPoems();
+                this.clearAllPackets();
             });
 
             // --- Drag and drop functionality for the file label ---
@@ -157,7 +157,7 @@
         }
 
         /**
-         * Processes the selected Word documents to extract poems.
+         * Processes the selected Word documents to extract packets.
          * Displays progress and notifications.
          */
         async processDocuments() {
@@ -187,7 +187,7 @@
             this.announceToScreenReader('process-status', 'Processing documents...');
 
             try {
-                let processedPoemCount = 0;
+                let processedPacketCount = 0;
                 let skippedCount = 0;
                 const totalFiles = this.selectedFiles.length;
                 console.log(`Processing ${totalFiles} selected files.`);
@@ -198,32 +198,32 @@
                     console.log(`Processing file ${i + 1}/${totalFiles}: ${file.name}`);
 
                     try {
-                        const poemsFromFile = await this.extractPoemsFromDocument(file);
-                        console.log(`Extracted ${poemsFromFile ? poemsFromFile.length : 0} potential poems from ${file.name}`);
-                        if (poemsFromFile && poemsFromFile.length > 0) {
-                            for (const poemData of poemsFromFile) {
-                                if (poemData && poemData.content && poemData.content.trim().length > 0) {
+                        const packetsFromFile = await this.extractPacketsFromDocument(file);
+                        console.log(`Extracted ${packetsFromFile ? packetsFromFile.length : 0} potential packets from ${file.name}`);
+                        if (packetsFromFile && packetsFromFile.length > 0) {
+                            for (const packetData of packetsFromFile) {
+                                if (packetData && packetData.content && packetData.content.trim().length > 0) {
                                     // Use a combination of title and content for duplication check
-                                    const isDuplicate = this.poems.some(existing =>
-                                        existing.title.toLowerCase() === poemData.title.toLowerCase() &&
-                                        existing.content.trim() === poemData.content.trim()
+                                    const isDuplicate = this.packets.some(existing =>
+                                        existing.title.toLowerCase() === packetData.title.toLowerCase() &&
+                                        existing.content.trim() === packetData.content.trim()
                                     );
 
                                     if (!isDuplicate) {
-                                        this.poems.push(poemData);
-                                        processedPoemCount++;
-                                        console.log(`Added new poem: "${poemData.title}" from "${file.name}"`);
+                                        this.packets.push(packetData);
+                                        processedPacketCount++;
+                                        console.log(`Added new packet: "${packetData.title}" from "${file.name}"`);
                                     } else {
                                         skippedCount++;
-                                        console.warn(`Duplicate poem detected and skipped: "${poemData.title || 'Untitled'}" from "${file.name}"`);
+                                        console.warn(`Duplicate packet detected and skipped: "${packetData.title || 'Untitled'}" from "${file.name}"`);
                                     }
                                 } else {
-                                    console.warn(`Poem data from ${file.name} was empty or invalid.`);
+                                    console.warn(`Packet data from ${file.name} was empty or invalid.`);
                                 }
                             }
                         } else {
-                            errors.push(`${file.name}: No valid poems found`);
-                            console.warn(`No valid poems found in ${file.name}.`);
+                            errors.push(`${file.name}: No valid packets found`);
+                            console.warn(`No valid packets found in ${file.name}.`);
                         }
                     } catch (error) {
                         console.error(`Error processing ${file.name}:`, error);
@@ -242,24 +242,24 @@
                 console.log('Finished processing all files. Resetting UI.');
                 this.resetProcessingUI();
 
-                if (processedPoemCount > 0) {
+                if (processedPacketCount > 0) {
                     this.updateDisplay();
-                    let message = `Successfully processed ${processedPoemCount} new poem${processedPoemCount > 1 ? 's' : ''}!`;
+                    let message = `Successfully processed ${processedPacketCount} new packet${processedPacketCount > 1 ? 's' : ''}!`;
                     if (skippedCount > 0) {
                         message += ` (${skippedCount} duplicate${skippedCount > 1 ? 's' : ''} skipped)`;
                     }
                     this.showNotification(message, 'success');
-                    this.announceToScreenReader('process-status', `${processedPoemCount} poems processed successfully`);
+                    this.announceToScreenReader('process-status', `${processedPacketCount} packets processed successfully`);
                     this.resetFileInput();
-                    console.log('Poem processing complete. Display updated.');
+                    console.log('Packet processing complete. Display updated.');
                 } else {
-                    let message = 'No new poems found in the uploaded documents!';
+                    let message = 'No new packets found in the uploaded documents!';
                     if (skippedCount > 0) {
-                        message = `All uploaded poems were duplicates or had no new content.`;
+                        message = `All uploaded packets were duplicates or had no new content.`;
                     }
                     this.showNotification(message, 'warning');
-                    this.announceToScreenReader('process-status', 'No new poems found');
-                    console.log('No new poems added after processing.');
+                    this.announceToScreenReader('process-status', 'No new packets found');
+                    console.log('No new packets added after processing.');
                 }
 
                 if (errors.length > 0) {
@@ -302,26 +302,26 @@
         }
 
         /**
-         * Clears all loaded poems and updates the display.
+         * Clears all loaded packets and updates the display.
          */
-        clearAllPoems() {
-            console.log('Clearing all poems.');
-            this.poems = [];
+        clearAllPackets() {
+            console.log('Clearing all packets.');
+            this.packets = [];
             this.updateDisplay();
             this.resetFileInput();
-            this.showNotification('All poems cleared!', 'info');
-            this.announceToScreenReader('process-status', 'All poems cleared.');
+            this.showNotification('All packets cleared!', 'info');
+            this.announceToScreenReader('process-status', 'All packets cleared.');
         }
 
         /**
          * Extracts HTML content from a DOCX file using Mammoth.js
-         * and attempts to identify multiple poems within it.
+         * and attempts to identify multiple packets within it.
          * @param {File} file - The DOCX file to process.
-         * @returns {Promise<Array<Object>>} A promise resolving to an array of poem objects.
+         * @returns {Promise<Array<Object>>} A promise resolving to an array of packet objects.
          * @throws {Error} If Mammoth.js is not loaded or content extraction fails.
          */
-        async extractPoemsFromDocument(file) {
-            console.log(`Attempting to extract poems from "${file.name}"...`);
+        async extractPacketsFromDocument(file) {
+            console.log(`Attempting to extract packets from "${file.name}"...`);
             if (!window.mammoth) {
                 console.error('Mammoth library (window.mammoth) is not loaded.');
                 throw new Error('Mammoth library not loaded. Please check the script tag.');
@@ -352,20 +352,20 @@
                     throw new Error('Document appears to be empty or too short after extraction.');
                 }
 
-                // Attempt to identify multiple poems
-                const identifiedPoems = this.identifyMultiplePoems(tempDiv, file.name, html);
-                console.log(`identifyMultiplePoems returned ${identifiedPoems.length} poems for "${file.name}".`);
+                // Attempt to identify multiple packets
+                const identifiedPackets = this.identifyMultiplePackets(tempDiv, file.name, html);
+                console.log(`identifyMultiplePackets returned ${identifiedPackets.length} packets for "${file.name}".`);
 
-                // Crucial Fallback: If multiple poem detection yields 0 or 1 *meaningful* poem,
-                // treat the whole document as one. This handles unusually formatted single poems.
-                // A "meaningful" poem for this check means substantial content.
-                if (identifiedPoems.length <= 1 || (identifiedPoems.length > 1 && identifiedPoems.every(p => p.content.length < 100))) {
-                    const singlePoem = this.createSinglePoemFromDocument(tempDiv, file.name, html, fullContent);
-                    console.log(`Multi-poem detection found ${identifiedPoems.length} potential segments. Treating "${file.name}" as a single poem: "${singlePoem.title}".`);
-                    return [singlePoem];
+                // Crucial Fallback: If multiple packet detection yields 0 or 1 *meaningful* packet,
+                // treat the whole document as one. This handles unusually formatted single packets.
+                // A "meaningful" packet for this check means substantial content.
+                if (identifiedPackets.length <= 1 || (identifiedPackets.length > 1 && identifiedPackets.every(p => p.content.length < 100))) {
+                    const singlePacket = this.createSinglePacketFromDocument(tempDiv, file.name, html, fullContent);
+                    console.log(`Multi-packet detection found ${identifiedPackets.length} potential segments. Treating "${file.name}" as a single packet: "${singlePacket.title}".`);
+                    return [singlePacket];
                 }
 
-                return identifiedPoems;
+                return identifiedPackets;
 
             } catch (error) {
                 console.error(`Failed to extract content from "${file.name}":`, error);
@@ -374,28 +374,28 @@
         }
 
         /**
-         * Attempts to identify and separate multiple poems within an HTML document structure.
+         * Attempts to identify and separate multiple packets within an HTML document structure.
          * Uses different strategies (headings, paragraph breaks, explicit separators).
          * @param {HTMLElement} tempDiv - A temporary div containing the document's HTML.
          * @param {string} filename - The original filename.
          * @param {string} fullHtml - The full HTML content from Mammoth.js.
-         * @returns {Array<Object>} An array of identified poem objects.
+         * @returns {Array<Object>} An array of identified packet objects.
          */
-        identifyMultiplePoems(tempDiv, filename, fullHtml) {
-            console.log(`Starting identifyMultiplePoems for "${filename}".`);
-            let poems = [];
-            const MIN_CONTENT_LENGTH_FOR_SPLIT = 100; // A segment must have at least this many chars to be a distinct poem
+        identifyMultiplePackets(tempDiv, filename, fullHtml) {
+            console.log(`Starting identifyMultiplePackets for "${filename}".`);
+            let packets = [];
+            const MIN_CONTENT_LENGTH_FOR_SPLIT = 100; // A segment must have at least this many chars to be a distinct packet
 
             // Strategy 1: Split by headings (H1, H2, H3)
             const headings = tempDiv.querySelectorAll('h1, h2, h3');
             if (headings.length > 1) {
-                const poemsByHeadings = this.extractPoemsByHeadings(tempDiv, filename, headings);
-                // Only consider this a successful multi-poem split if at least two poems are substantial
-                if (poemsByHeadings.filter(p => p.content.length >= MIN_CONTENT_LENGTH_FOR_SPLIT).length > 1) {
-                    console.log(`Strategy 1 (Headings) found ${poemsByHeadings.length} poems.`);
-                    return poemsByHeadings;
+                const packetsByHeadings = this.extractPacketsByHeadings(tempDiv, filename, headings);
+                // Only consider this a successful multi-packet split if at least two packets are substantial
+                if (packetsByHeadings.filter(p => p.content.length >= MIN_CONTENT_LENGTH_FOR_SPLIT).length > 1) {
+                    console.log(`Strategy 1 (Headings) found ${packetsByHeadings.length} packets.`);
+                    return packetsByHeadings;
                 } else {
-                    console.log(`Strategy 1 (Headings) found segments, but not enough substantial ones to confirm multiple poems.`);
+                    console.log(`Strategy 1 (Headings) found segments, but not enough substantial ones to confirm multiple packets.`);
                 }
             }
 
@@ -422,10 +422,10 @@
                     });
 
                     if (meaningfulParts.length > 1) {
-                        const poemsBySeparator = this.extractPoemsBySeparator(meaningfulParts, filename);
-                        if (poemsBySeparator.length > 1) {
-                            console.log(`Strategy 2 (Separators: ${pattern}) found ${poemsBySeparator.length} poems.`);
-                            return poemsBySeparator; // Return early if a clear separator is found
+                        const packetsBySeparator = this.extractPacketsBySeparator(meaningfulParts, filename);
+                        if (packetsBySeparator.length > 1) {
+                            console.log(`Strategy 2 (Separators: ${pattern}) found ${packetsBySeparator.length} packets.`);
+                            return packetsBySeparator; // Return early if a clear separator is found
                         }
                     }
                 }
@@ -435,31 +435,31 @@
             // This is the most ambiguous strategy, so it should be the last resort and very strict.
             const paragraphs = Array.from(tempDiv.querySelectorAll('p'));
             if (paragraphs.length > 3) { // Need a good number of paragraphs to consider this
-                const poemsByParagraphs = this.extractPoemsByParagraphSeparation(tempDiv, filename, paragraphs);
-                 if (poemsByParagraphs.filter(p => p.content.length >= MIN_CONTENT_LENGTH_FOR_SPLIT).length > 1) {
-                    console.log(`Strategy 3 (Paragraph Separation) found ${poemsByParagraphs.length} poems.`);
-                    return poemsByParagraphs;
+                const packetsByParagraphs = this.extractPacketsByParagraphSeparation(tempDiv, filename, paragraphs);
+                 if (packetsByParagraphs.filter(p => p.content.length >= MIN_CONTENT_LENGTH_FOR_SPLIT).length > 1) {
+                    console.log(`Strategy 3 (Paragraph Separation) found ${packetsByParagraphs.length} packets.`);
+                    return packetsByParagraphs;
                 } else {
-                    console.log(`Strategy 3 (Paragraph Separation) found segments, but not enough substantial ones to confirm multiple poems.`);
+                    console.log(`Strategy 3 (Paragraph Separation) found segments, but not enough substantial ones to confirm multiple packets.`);
                 }
             }
 
-            console.log(`No strong multi-poem separation detected for "${filename}".`);
-            return []; // Return empty, which will trigger the single-poem fallback
+            console.log(`No strong multi-packet separation detected for "${filename}".`);
+            return []; // Return empty, which will trigger the single-packet fallback
         }
 
         /**
-         * Extracts poems by identifying text blocks separated by heading tags (h1, h2, h3).
+         * Extracts packets by identifying text blocks separated by heading tags (h1, h2, h3).
          * @param {HTMLElement} tempDiv - The temporary div containing the document HTML.
          * @param {string} filename - The name of the original file.
          * @param {NodeList<HTMLElement>} headings - A NodeList of h1, h2, h3 elements.
-         * @returns {Array<Object>} An array of poem objects.
+         * @returns {Array<Object>} An array of packet objects.
          */
-        extractPoemsByHeadings(tempDiv, filename, headings) {
-            const poems = [];
+        extractPacketsByHeadings(tempDiv, filename, headings) {
+            const packets = [];
             const allElements = Array.from(tempDiv.children);
             console.log(`  Extracting by headings for "${filename}". Found ${headings.length} headings.`);
-            const MIN_POEM_LENGTH_HEADING = 50; // Minimum characters for a poem section identified by heading
+            const MIN_POEM_LENGTH_HEADING = 50; // Minimum characters for a packet section identified by heading
 
             for (let i = 0; i < headings.length; i++) {
                 const currentHeading = headings[i];
@@ -476,10 +476,10 @@
                 const endIndex = nextHeading ? allElements.indexOf(nextHeading) : allElements.length;
 
                 // Collect all elements between current heading and the next (or end of document)
-                const poemElements = allElements.slice(startIndex + 1, endIndex);
+                const packetElements = allElements.slice(startIndex + 1, endIndex);
 
                 // Filter out any empty text nodes or very short paragraphs that might be artifacts
-                const meaningfulElements = poemElements.filter(el => {
+                const meaningfulElements = packetElements.filter(el => {
                     // Check if element has actual content or is a line break (<br>) or non-empty paragraph
                     // Consider content beyond just whitespace or &nbsp;
                     return el.textContent.trim().length > 0 || (el.tagName === 'P' && el.innerHTML.trim() !== '&nbsp;' && el.innerHTML.trim() !== '');
@@ -491,39 +491,39 @@
                 }
 
                 // Preserve the structure and formatting as much as possible for htmlContent
-                const poemHtml = meaningfulElements.map(el => el.outerHTML).join('\n');
-                const poemContent = meaningfulElements.map(el => {
+                const packetHtml = meaningfulElements.map(el => el.outerHTML).join('\n');
+                const packetContent = meaningfulElements.map(el => {
                     // Convert <br> to newline, otherwise use textContent.
                     // This is for plain text content for word count and duplication check.
                     return el.tagName === 'BR' ? '\n' : el.textContent;
                 }).join('\n').trim();
 
-                // Add the heading itself to the poem's htmlContent to retain its styling
-                const fullPoemHtml = currentHeading.outerHTML + '\n' + poemHtml;
+                // Add the heading itself to the packet's htmlContent to retain its styling
+                const fullPacketHtml = currentHeading.outerHTML + '\n' + packetHtml;
 
-                if (poemContent.length >= MIN_POEM_LENGTH_HEADING) {
-                    poems.push(this.createPoemObject(title, poemContent, fullPoemHtml, filename));
+                if (packetContent.length >= MIN_POEM_LENGTH_HEADING) {
+                    packets.push(this.createPacketObject(title, packetContent, fullPacketHtml, filename));
                 } else {
-                    console.log(`    Skipping heading "${title}" due to insufficient content (${poemContent.length} chars).`);
+                    console.log(`    Skipping heading "${title}" due to insufficient content (${packetContent.length} chars).`);
                 }
             }
-            console.log(`  Finished heading extraction. Found ${poems.length} poems.`);
-            return poems;
+            console.log(`  Finished heading extraction. Found ${packets.length} packets.`);
+            return packets;
         }
 
         /**
-         * Extracts poems by identifying blocks of paragraphs separated by empty or very short paragraphs.
+         * Extracts packets by identifying blocks of paragraphs separated by empty or very short paragraphs.
          * This strategy is now very conservative.
          * @param {HTMLElement} tempDiv - The temporary div containing the document HTML.
          * @param {string} filename - The name of the original file.
          * @param {NodeList<HTMLElement>} paragraphs - A NodeList of paragraph elements.
-         * @returns {Array<Object>} An array of poem objects.
+         * @returns {Array<Object>} An array of packet objects.
          */
-        extractPoemsByParagraphSeparation(tempDiv, filename, paragraphs) {
-            const poems = [];
-            let currentPoemElements = [];
+        extractPacketsByParagraphSeparation(tempDiv, filename, paragraphs) {
+            const packets = [];
+            let currentPacketElements = [];
             let currentTitle = '';
-            let poemIndex = 1;
+            let packetIndex = 1;
             console.log(`  Extracting by paragraph separation for "${filename}". Found ${paragraphs.length} paragraphs.`);
             const MIN_POEM_LENGTH_PARA_SPLIT = 150; // Higher minimum for this ambiguous splitting method
 
@@ -532,7 +532,7 @@
                 const text = p.textContent.trim();
                 const html = p.outerHTML;
 
-                // A much stricter heuristic for a "significant break" that indicates a new poem.
+                // A much stricter heuristic for a "significant break" that indicates a new packet.
                 // Require a truly empty paragraph or a paragraph with only non-breaking spaces,
                 // OR at least two consecutive empty-like paragraphs.
                 const isTrulyEmpty = text.length === 0 || p.innerHTML.trim() === '&nbsp;' || p.innerHTML.trim() === '<br>' || p.innerHTML.trim() === '<br />';
@@ -547,59 +547,59 @@
                     (p.querySelector('strong, b') || p.style.textAlign === 'center' || (text === text.toUpperCase() && text.length < 50 && text.split(/\s+/).length < 10)); // Max 10 words for an ALL CAPS title
 
                 if (isSignificantBreak) {
-                    if (currentPoemElements.length > 0) {
-                        const poemContent = currentPoemElements.map(el => el.textContent).join('\n').trim();
-                        const poemHtml = currentPoemElements.map(el => el.outerHTML).join('\n');
-                        const title = currentTitle || `Poem ${poemIndex} from ${filename}`;
+                    if (currentPacketElements.length > 0) {
+                        const packetContent = currentPacketElements.map(el => el.textContent).join('\n').trim();
+                        const packetHtml = currentPacketElements.map(el => el.outerHTML).join('\n');
+                        const title = currentTitle || `Packet ${packetIndex} from ${filename}`;
 
-                        if (poemContent.length >= MIN_POEM_LENGTH_PARA_SPLIT) { // Ensure substantial content
-                            poems.push(this.createPoemObject(title, poemContent, poemHtml, filename));
-                            poemIndex++;
-                            console.log(`    Poem #${poemIndex - 1} identified by significant paragraph break: "${title}"`);
+                        if (packetContent.length >= MIN_POEM_LENGTH_PARA_SPLIT) { // Ensure substantial content
+                            packets.push(this.createPacketObject(title, packetContent, packetHtml, filename));
+                            packetIndex++;
+                            console.log(`    Packet #${packetIndex - 1} identified by significant paragraph break: "${title}"`);
                         } else {
-                            console.log(`    Skipping short poem segment before break (length: ${poemContent.length}). Likely part of previous/next.`);
+                            console.log(`    Skipping short packet segment before break (length: ${packetContent.length}). Likely part of previous/next.`);
                         }
-                        currentPoemElements = [];
+                        currentPacketElements = [];
                         currentTitle = '';
                     }
-                    // Skip the actual empty/break paragraphs from being added to any poem's content
-                } else if (mightBeTitle && currentPoemElements.length === 0) {
-                    // If it's a potential title and no current poem content, start a new one
+                    // Skip the actual empty/break paragraphs from being added to any packet's content
+                } else if (mightBeTitle && currentPacketElements.length === 0) {
+                    // If it's a potential title and no current packet content, start a new one
                     currentTitle = text;
-                    currentPoemElements.push(p);
+                    currentPacketElements.push(p);
                     console.log(`    Potential title detected: "${text}"`);
                 } else {
-                    currentPoemElements.push(p);
+                    currentPacketElements.push(p);
                 }
             }
 
-            // Add any remaining poem elements after the loop finishes
-            if (currentPoemElements.length > 0) {
-                const poemContent = currentPoemElements.map(el => el.textContent).join('\n').trim();
-                const poemHtml = currentPoemElements.map(el => el.outerHTML).join('\n');
-                const title = currentTitle || `Poem ${poemIndex} from ${filename}`;
+            // Add any remaining packet elements after the loop finishes
+            if (currentPacketElements.length > 0) {
+                const packetContent = currentPacketElements.map(el => el.textContent).join('\n').trim();
+                const packetHtml = currentPacketElements.map(el => el.outerHTML).join('\n');
+                const title = currentTitle || `Packet ${packetIndex} from ${filename}`;
 
-                if (poemContent.length >= MIN_POEM_LENGTH_PARA_SPLIT) {
-                    poems.push(this.createPoemObject(title, poemContent, poemHtml, filename));
-                    console.log(`    Last poem identified: "${title}"`);
+                if (packetContent.length >= MIN_POEM_LENGTH_PARA_SPLIT) {
+                    packets.push(this.createPacketObject(title, packetContent, packetHtml, filename));
+                    console.log(`    Last packet identified: "${title}"`);
                 } else {
-                    console.log(`    Skipping last poem segment due to insufficient content (length: ${poemContent.length}). Likely part of previous/next.`);
+                    console.log(`    Skipping last packet segment due to insufficient content (length: ${packetContent.length}). Likely part of previous/next.`);
                 }
             }
-            console.log(`  Finished paragraph separation. Found ${poems.length} poems.`);
-            return poems;
+            console.log(`  Finished paragraph separation. Found ${packets.length} packets.`);
+            return packets;
         }
 
         /**
-         * Extracts poems by identifying blocks of HTML content based on detected separator patterns.
+         * Extracts packets by identifying blocks of HTML content based on detected separator patterns.
          * @param {Array<string>} htmlParts - Array of HTML strings separated by a pattern.
          * @param {string} filename - The name of the original file.
-         * @returns {Array<Object>} An array of poem objects.
+         * @returns {Array<Object>} An array of packet objects.
          */
-        extractPoemsBySeparator(htmlParts, filename) {
-            const poems = [];
+        extractPacketsBySeparator(htmlParts, filename) {
+            const packets = [];
             console.log(`  Extracting by custom separators for "${filename}". Found ${htmlParts.length} parts.`);
-            const MIN_POEM_LENGTH_SEPARATOR = 50; // Minimum characters for a poem section identified by separator
+            const MIN_POEM_LENGTH_SEPARATOR = 50; // Minimum characters for a packet section identified by separator
 
             htmlParts.forEach((part, index) => {
                 const tempDiv = document.createElement('div');
@@ -638,32 +638,32 @@
                     if (firstLine.length > 0 && firstLine.length < 100) {
                         title = firstLine;
                     } else {
-                        title = `Poem ${index + 1} from ${filename}`;
+                        title = `Packet ${index + 1} from ${filename}`;
                     }
                 }
 
                 if (content.length >= MIN_POEM_LENGTH_SEPARATOR) {
-                    poems.push(this.createPoemObject(title, content, part.trim(), filename));
-                    console.log(`    Poem #${index + 1} identified by separator: "${title}"`);
+                    packets.push(this.createPacketObject(title, content, part.trim(), filename));
+                    console.log(`    Packet #${index + 1} identified by separator: "${title}"`);
                 } else {
                     console.log(`    Skipping segment after separator due to insufficient content (length: ${content.length}).`);
                 }
             });
-            console.log(`  Finished separator extraction. Found ${poems.length} poems.`);
-            return poems;
+            console.log(`  Finished separator extraction. Found ${packets.length} packets.`);
+            return packets;
         }
 
 
         /**
-         * Creates a single poem object from an entire document when multiple poems are not detected.
+         * Creates a single packet object from an entire document when multiple packets are not detected.
          * @param {HTMLElement} tempDiv - The temporary div containing the document HTML.
          * @param {string} filename - The original filename.
          * @param {string} html - The full HTML content from Mammoth.js.
          * @param {string} content - The full plain text content of the document.
-         * @returns {Object} A single poem object.
+         * @returns {Object} A single packet object.
          */
-        createSinglePoemFromDocument(tempDiv, filename, html, content) {
-            console.log(`Creating single poem object for "${filename}".`);
+        createSinglePacketFromDocument(tempDiv, filename, html, content) {
+            console.log(`Creating single packet object for "${filename}".`);
             const title = this.extractTitle(tempDiv, filename);
             const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
 
@@ -671,7 +671,7 @@
                 id: Date.now() + Math.random(),
                 title: title,
                 content: content,
-                htmlContent: html, // The full HTML of the document as a single poem
+                htmlContent: html, // The full HTML of the document as a single packet
                 filename: filename,
                 wordCount: wordCount,
                 dateAdded: new Date().toISOString()
@@ -679,14 +679,14 @@
         }
 
         /**
-         * Creates a poem object with all necessary properties.
-         * @param {string} title - The title of the poem.
-         * @param {string} content - The plain text content of the poem.
-         * @param {string} htmlContent - The HTML content of the poem.
-         * @param {string} filename - The original filename from which the poem was extracted.
-         * @returns {Object} The poem object.
+         * Creates a packet object with all necessary properties.
+         * @param {string} title - The title of the packet.
+         * @param {string} content - The plain text content of the packet.
+         * @param {string} htmlContent - The HTML content of the packet.
+         * @param {string} filename - The original filename from which the packet was extracted.
+         * @returns {Object} The packet object.
          */
-        createPoemObject(title, content, htmlContent, filename) {
+        createPacketObject(title, content, htmlContent, filename) {
             const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
             return {
                 id: Date.now() + Math.random(),
@@ -765,8 +765,8 @@
             }
 
             // Capitalize first letter of fallback titles for better display
-            if (title.startsWith('poem ') && title.toLowerCase().includes('from')) {
-                 // Leave "Poem X from file" as is
+            if (title.startsWith('packet ') && title.toLowerCase().includes('from')) {
+                 // Leave "Packet X from file" as is
             } else if (title.length > 0) {
                 title = title.charAt(0).toUpperCase() + title.slice(1);
             }
@@ -775,124 +775,124 @@
         }
 
         /**
-         * Updates the display of loaded poems in the UI.
-         * Enables/disables the download button based on poem count.
-         * Re-initializes drag-and-drop for poem reordering.
+         * Updates the display of loaded packets in the UI.
+         * Enables/disables the download button based on packet count.
+         * Re-initializes drag-and-drop for packet reordering.
          */
         updateDisplay() {
-            console.log('Updating display for poems. Total poems:', this.poems.length);
-            const poemsList = document.getElementById('poemsList');
+            console.log('Updating display for packets. Total packets:', this.packets.length);
+            const packetsList = document.getElementById('packetsList');
             const downloadBtn = document.getElementById('downloadBtn');
             const clearBtn = document.getElementById('clearBtn');
-            const placeholder = document.getElementById('poemsPlaceholder');
-            const poemCountSpan = document.getElementById('poemCount');
+            const placeholder = document.getElementById('packetsPlaceholder');
+            const packetCountSpan = document.getElementById('packetCount');
 
-            if (!poemsList || !downloadBtn || !clearBtn || !placeholder || !poemCountSpan) {
+            if (!packetsList || !downloadBtn || !clearBtn || !placeholder || !packetCountSpan) {
                 console.error('Required DOM elements for display update not found. Ensure all IDs are correct in HTML.');
                 return;
             }
 
-            poemsList.innerHTML = ''; // Clear existing list
-            poemCountSpan.textContent = this.poems.length.toString();
+            packetsList.innerHTML = ''; // Clear existing list
+            packetCountSpan.textContent = this.packets.length.toString();
 
-            if (this.poems.length === 0) {
+            if (this.packets.length === 0) {
                 placeholder.style.display = 'block';
-                poemsList.style.display = 'none';
+                packetsList.style.display = 'none';
                 downloadBtn.disabled = true;
                 clearBtn.disabled = true;
-                this.announceToScreenReader('poem-list-status', 'No poems loaded.');
-                console.log('No poems to display. Placeholder shown, buttons disabled.');
+                this.announceToScreenReader('packet-list-status', 'No packets loaded.');
+                console.log('No packets to display. Placeholder shown, buttons disabled.');
                 return;
             }
 
             placeholder.style.display = 'none';
-            poemsList.style.display = 'block';
+            packetsList.style.display = 'block';
             downloadBtn.disabled = false;
             clearBtn.disabled = false;
 
-            // Re-render poems based on the current order in this.poems array
-            this.poems.forEach((poem, index) => {
+            // Re-render packets based on the current order in this.packets array
+            this.packets.forEach((packet, index) => {
                 const li = document.createElement('li');
-                li.className = 'poem-item bg-white p-4 shadow-sm rounded-lg flex items-center justify-between transition-all duration-200 ease-in-out';
+                li.className = 'packet-item bg-white p-4 shadow-sm rounded-lg flex items-center justify-between transition-all duration-200 ease-in-out';
                 li.draggable = true;
-                li.dataset.id = poem.id;
+                li.dataset.id = packet.id;
                 li.dataset.index = index; // Important for reordering
 
                 li.innerHTML = `
                     <div class="flex-1 min-w-0">
-                        <h3 class="text-lg font-semibold text-gray-800 truncate">${this.escapeHtml(poem.title)}</h3>
-                        <p class="text-sm text-gray-500 truncate">${this.escapeHtml(poem.filename)} - ${poem.wordCount} words</p>
+                        <h3 class="text-lg font-semibold text-gray-800 truncate">${this.escapeHtml(packet.title)}</h3>
+                        <p class="text-sm text-gray-500 truncate">${this.escapeHtml(packet.filename)} - ${packet.wordCount} words</p>
                     </div>
                     <div class="flex items-center space-x-2 ml-4">
-                        <button type="button" class="move-up-btn p-2 rounded-full text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50" aria-label="Move poem ${this.escapeHtml(poem.title)} up" data-id="${poem.id}" ${index === 0 ? 'disabled' : ''}>
+                        <button type="button" class="move-up-btn p-2 rounded-full text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50" aria-label="Move packet ${this.escapeHtml(packet.title)} up" data-id="${packet.id}" ${index === 0 ? 'disabled' : ''}>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
                             </svg>
                         </button>
-                        <button type="button" class="move-down-btn p-2 rounded-full text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50" aria-label="Move poem ${this.escapeHtml(poem.title)} down" data-id="${poem.id}" ${index === this.poems.length - 1 ? 'disabled' : ''}>
+                        <button type="button" class="move-down-btn p-2 rounded-full text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50" aria-label="Move packet ${this.escapeHtml(packet.title)} down" data-id="${packet.id}" ${index === this.packets.length - 1 ? 'disabled' : ''}>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                             </svg>
                         </button>
-                        <button type="button" class="view-poem-btn p-2 rounded-full text-blue-600 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50" aria-label="View poem ${this.escapeHtml(poem.title)}" data-id="${poem.id}">
+                        <button type="button" class="view-packet-btn p-2 rounded-full text-blue-600 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50" aria-label="View packet ${this.escapeHtml(packet.title)}" data-id="${packet.id}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                                 <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
                             </svg>
                         </button>
-                        <button type="button" class="remove-poem-btn p-2 rounded-full text-red-600 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50" aria-label="Remove poem ${this.escapeHtml(poem.title)}" data-id="${poem.id}">
+                        <button type="button" class="remove-packet-btn p-2 rounded-full text-red-600 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50" aria-label="Remove packet ${this.escapeHtml(packet.title)}" data-id="${packet.id}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
                             </svg>
                         </button>
                     </div>
                 `;
-                poemsList.appendChild(li);
+                packetsList.appendChild(li);
             });
 
-            this.addPoemListEventListeners();
-            this.announceToScreenReader('poem-list-status', `${this.poems.length} poems loaded. Use drag and drop or arrows to reorder.`);
-            console.log('Poem list rendered and event listeners added.');
+            this.addPacketListEventListeners();
+            this.announceToScreenReader('packet-list-status', `${this.packets.length} packets loaded. Use drag and drop or arrows to reorder.`);
+            console.log('Packet list rendered and event listeners added.');
         }
 
         /**
-         * Adds event listeners for viewing, removing, and reordering poems.
+         * Adds event listeners for viewing, removing, and reordering packets.
          */
-        addPoemListEventListeners() {
-            const poemsList = document.getElementById('poemsList');
-            if (!poemsList) {
-                console.error('Poem list element not found for event listeners.');
+        addPacketListEventListeners() {
+            const packetsList = document.getElementById('packetsList');
+            if (!packetsList) {
+                console.error('Packet list element not found for event listeners.');
                 return;
             }
 
             // Delegated event listeners for buttons for better performance and dynamic content
-            poemsList.removeEventListener('click', this._poemListClickHandler); // Remove old handler if exists
-            this._poemListClickHandler = (e) => { // Store handler for removal
+            packetsList.removeEventListener('click', this._packetListClickHandler); // Remove old handler if exists
+            this._packetListClickHandler = (e) => { // Store handler for removal
                 const button = e.target.closest('button');
                 if (!button) return;
 
                 const id = button.dataset.id;
-                if (button.classList.contains('view-poem-btn')) {
-                    this.viewPoem(id);
-                } else if (button.classList.contains('remove-poem-btn')) {
-                    this.removePoem(id);
+                if (button.classList.contains('view-packet-btn')) {
+                    this.viewPacket(id);
+                } else if (button.classList.contains('remove-packet-btn')) {
+                    this.removePacket(id);
                 } else if (button.classList.contains('move-up-btn')) {
-                    this.movePoemUp(id);
+                    this.movePacketUp(id);
                 } else if (button.classList.contains('move-down-btn')) {
-                    this.movePoemDown(id);
+                    this.movePacketDown(id);
                 }
             };
-            poemsList.addEventListener('click', this._poemListClickHandler);
+            packetsList.addEventListener('click', this._packetListClickHandler);
 
 
             // Drag and Drop for reordering
-            poemsList.removeEventListener('dragstart', this._dragStartHandler);
-            poemsList.removeEventListener('dragover', this._dragOverHandler);
-            poemsList.removeEventListener('drop', this._dropHandler);
-            poemsList.removeEventListener('dragend', this._dragEndHandler);
+            packetsList.removeEventListener('dragstart', this._dragStartHandler);
+            packetsList.removeEventListener('dragover', this._dragOverHandler);
+            packetsList.removeEventListener('drop', this._dropHandler);
+            packetsList.removeEventListener('dragend', this._dragEndHandler);
 
             this._dragStartHandler = (e) => {
-                const target = e.target.closest('.poem-item');
+                const target = e.target.closest('.packet-item');
                 if (target) {
                     this.draggedIndex = parseInt(target.dataset.index, 10);
                     e.dataTransfer.effectAllowed = 'move';
@@ -901,14 +901,14 @@
                     console.log('Drag started for index:', this.draggedIndex);
                 }
             };
-            poemsList.addEventListener('dragstart', this._dragStartHandler);
+            packetsList.addEventListener('dragstart', this._dragStartHandler);
 
             this._dragOverHandler = (e) => {
                 this.preventDefaults(e); // Allow drop
-                const target = e.target.closest('.poem-item');
+                const target = e.target.closest('.packet-item');
                 if (target && target.dataset.index !== undefined && this.draggedIndex !== null) {
                     const dragOverIndex = parseInt(target.dataset.index, 10);
-                    const draggedEl = poemsList.querySelector('.poem-item.dragging');
+                    const draggedEl = packetsList.querySelector('.packet-item.dragging');
 
                     if (draggedEl && this.draggedIndex !== dragOverIndex) {
                         const currentParent = target.parentNode;
@@ -926,25 +926,25 @@
                     }
                 }
             };
-            poemsList.addEventListener('dragover', this._dragOverHandler);
+            packetsList.addEventListener('dragover', this._dragOverHandler);
 
             // No specific action needed for dragleave for this simple reorder logic
 
             this._dropHandler = (e) => {
                 this.preventDefaults(e);
-                const draggedEl = poemsList.querySelector('.poem-item.dragging'); // Get the element still marked as dragging
+                const draggedEl = packetsList.querySelector('.packet-item.dragging'); // Get the element still marked as dragging
 
                 if (draggedEl && this.draggedIndex !== null) {
-                    const newIndex = Array.from(poemsList.children).indexOf(draggedEl); // Get the new visual index
+                    const newIndex = Array.from(packetsList.children).indexOf(draggedEl); // Get the new visual index
 
                     if (this.draggedIndex !== newIndex && newIndex !== -1) {
                         console.log(`Drop detected. Original Dragged Index: ${this.draggedIndex}, New Visual Index: ${newIndex}`);
 
-                        const [draggedPoem] = this.poems.splice(this.draggedIndex, 1);
-                        this.poems.splice(newIndex, 0, draggedPoem);
+                        const [draggedPacket] = this.packets.splice(this.draggedIndex, 1);
+                        this.packets.splice(newIndex, 0, draggedPacket);
 
-                        this.showNotification(`Reordered poem "${draggedPoem.title}"`, 'info');
-                        this.announceToScreenReader('poem-list-status', `Poem ${draggedPoem.title} moved to position ${newIndex + 1}.`);
+                        this.showNotification(`Reordered packet "${draggedPacket.title}"`, 'info');
+                        this.announceToScreenReader('packet-list-status', `Packet ${draggedPacket.title} moved to position ${newIndex + 1}.`);
 
                         this.draggedIndex = null; // Reset
                         draggedEl.classList.remove('dragging'); // Remove dragging class
@@ -952,7 +952,7 @@
                         // Re-render the list to reflect the new order and update data-index attributes correctly
                         this.updateDisplay();
                     } else {
-                        console.log('Poem dropped on its original position or invalid drop. No reordering needed.');
+                        console.log('Packet dropped on its original position or invalid drop. No reordering needed.');
                         this.draggedIndex = null;
                         if (draggedEl) draggedEl.classList.remove('dragging');
                     }
@@ -962,89 +962,89 @@
                     this.draggedIndex = null;
                 }
             };
-            poemsList.addEventListener('drop', this._dropHandler);
+            packetsList.addEventListener('drop', this._dropHandler);
 
             this._dragEndHandler = (e) => {
-                const draggedEl = poemsList.querySelector('.poem-item.dragging');
+                const draggedEl = packetsList.querySelector('.packet-item.dragging');
                 if (draggedEl) {
                     draggedEl.classList.remove('dragging');
                 }
                 this.draggedIndex = null; // Reset
                 console.log('Drag ended. draggedIndex reset.');
             };
-            poemsList.addEventListener('dragend', this._dragEndHandler);
+            packetsList.addEventListener('dragend', this._dragEndHandler);
 
-            console.log('Drag and drop listeners (re)added to poem list.');
+            console.log('Drag and drop listeners (re)added to packet list.');
         }
 
         /**
-         * Moves a poem up in the list (towards the beginning of the array).
-         * @param {string} id - The ID of the poem to move.
+         * Moves a packet up in the list (towards the beginning of the array).
+         * @param {string} id - The ID of the packet to move.
          */
-        movePoemUp(id) {
-            const index = this.poems.findIndex(p => p.id == id);
+        movePacketUp(id) {
+            const index = this.packets.findIndex(p => p.id == id);
             if (index > 0) {
-                const [poem] = this.poems.splice(index, 1);
-                this.poems.splice(index - 1, 0, poem);
+                const [packet] = this.packets.splice(index, 1);
+                this.packets.splice(index - 1, 0, packet);
                 this.updateDisplay();
-                this.showNotification(`Moved "${poem.title}" up.`, 'info');
-                this.announceToScreenReader('poem-list-status', `Poem ${poem.title} moved up to position ${index}.`);
-                // Re-focus the moved poem's up button for better accessibility
+                this.showNotification(`Moved "${packet.title}" up.`, 'info');
+                this.announceToScreenReader('packet-list-status', `Packet ${packet.title} moved up to position ${index}.`);
+                // Re-focus the moved packet's up button for better accessibility
                 document.querySelector(`li[data-id="${id}"] .move-up-btn`)?.focus();
             } else {
-                this.showNotification('Poem is already at the top.', 'info');
+                this.showNotification('Packet is already at the top.', 'info');
             }
         }
 
         /**
-         * Moves a poem down in the list (towards the end of the array).
-         * @param {string} id - The ID of the poem to move.
+         * Moves a packet down in the list (towards the end of the array).
+         * @param {string} id - The ID of the packet to move.
          */
-        movePoemDown(id) {
-            const index = this.poems.findIndex(p => p.id == id);
-            if (index < this.poems.length - 1 && index !== -1) {
-                const [poem] = this.poems.splice(index, 1);
-                this.poems.splice(index + 1, 0, poem);
+        movePacketDown(id) {
+            const index = this.packets.findIndex(p => p.id == id);
+            if (index < this.packets.length - 1 && index !== -1) {
+                const [packet] = this.packets.splice(index, 1);
+                this.packets.splice(index + 1, 0, packet);
                 this.updateDisplay();
-                this.showNotification(`Moved "${poem.title}" down.`, 'info');
-                this.announceToScreenReader('poem-list-status', `Poem ${poem.title} moved down to position ${index + 2}.`);
-                // Re-focus the moved poem's down button for better accessibility
+                this.showNotification(`Moved "${packet.title}" down.`, 'info');
+                this.announceToScreenReader('packet-list-status', `Packet ${packet.title} moved down to position ${index + 2}.`);
+                // Re-focus the moved packet's down button for better accessibility
                 document.querySelector(`li[data-id="${id}"] .move-down-btn`)?.focus();
             } else {
-                this.showNotification('Poem is already at the bottom.', 'info');
+                this.showNotification('Packet is already at the bottom.', 'info');
             }
         }
 
         /**
-         * Removes a poem from the list by its ID.
-         * @param {string} id - The ID of the poem to remove.
+         * Removes a packet from the list by its ID.
+         * @param {string} id - The ID of the packet to remove.
          */
-        removePoem(id) {
-            console.log('Attempting to remove poem with ID:', id);
-            const initialCount = this.poems.length;
-            const removedPoem = this.poems.find(poem => poem.id == id);
-            this.poems = this.poems.filter(poem => poem.id != id); // Use != for loose comparison with dataset.id (string)
-            if (this.poems.length < initialCount) {
-                this.showNotification(`Poem "${removedPoem ? removedPoem.title : 'Unknown'}" removed!`, 'success');
-                this.announceToScreenReader('poem-list-status', `Poem ${removedPoem ? removedPoem.title : 'Unknown'} removed.`);
+        removePacket(id) {
+            console.log('Attempting to remove packet with ID:', id);
+            const initialCount = this.packets.length;
+            const removedPacket = this.packets.find(packet => packet.id == id);
+            this.packets = this.packets.filter(packet => packet.id != id); // Use != for loose comparison with dataset.id (string)
+            if (this.packets.length < initialCount) {
+                this.showNotification(`Packet "${removedPacket ? removedPacket.title : 'Unknown'}" removed!`, 'success');
+                this.announceToScreenReader('packet-list-status', `Packet ${removedPacket ? removedPacket.title : 'Unknown'} removed.`);
                 this.updateDisplay();
-                console.log('Poem removed successfully. Remaining poems:', this.poems.length);
+                console.log('Packet removed successfully. Remaining packets:', this.packets.length);
             } else {
-                console.warn('Poem with ID not found:', id);
+                console.warn('Packet with ID not found:', id);
             }
         }
 
         /**
-         * Displays a poem's content in a modal.
-         * @param {string} id - The ID of the poem to view.
+         * Displays a packet's content in a modal.
+         * @param {string} id - The ID of the packet to view.
          */
-        viewPoem(id) {
-            console.log('Viewing poem with ID:', id);
-            const poem = this.poems.find(p => p.id == id);
-            if (poem) {
-                const modal = document.getElementById('poemModal');
-                const modalTitle = document.getElementById('poemModalTitle');
-                const modalContent = document.getElementById('poemModalContent');
+        viewPacket(id) {
+            console.log('Viewing packet with ID:', id);
+            const packet = this.packets.find(p => p.id == id);
+            if (packet) {
+                const modal = document.getElementById('packetModal');
+                const modalTitle = document.getElementById('packetModalTitle');
+                const modalContent = document.getElementById('packetModalContent');
                 const closeModalBtn = document.getElementById('closeModal');
 
                 if (!modal || !modalTitle || !modalContent || !closeModalBtn) {
@@ -1053,9 +1053,9 @@
                     return;
                 }
 
-                modalTitle.textContent = poem.title;
+                modalTitle.textContent = packet.title;
                 // Use innerHTML to preserve formatting from Mammoth.js
-                modalContent.innerHTML = poem.htmlContent;
+                modalContent.innerHTML = packet.htmlContent;
                 modal.classList.remove('hidden');
                 modal.setAttribute('aria-hidden', 'false');
                 modal.focus(); // Focus the modal for accessibility
@@ -1079,20 +1079,20 @@
                 };
                 document.addEventListener('keydown', handleEscape);
 
-                console.log(`Modal opened for "${poem.title}".`);
+                console.log(`Modal opened for "${packet.title}".`);
             } else {
-                this.showNotification('Poem not found.', 'error');
-                console.warn('Attempted to view non-existent poem ID:', id);
+                this.showNotification('Packet not found.', 'error');
+                console.warn('Attempted to view non-existent packet ID:', id);
             }
         }
 
         /**
-         * Combines all loaded poems into a single HTML document and triggers a download.
+         * Combines all loaded packets into a single HTML document and triggers a download.
          */
         downloadCombinedDocument() {
-            if (this.poems.length === 0) {
-                this.showNotification('No poems to download!', 'warning');
-                console.warn('Download attempted with no poems.');
+            if (this.packets.length === 0) {
+                this.showNotification('No packets to download!', 'warning');
+                console.warn('Download attempted with no packets.');
                 return;
             }
 
@@ -1100,15 +1100,15 @@
 
             // Generate Table of Contents
             let tableOfContentsHtml = '';
-            if (this.poems.length > 0) {
+            if (this.packets.length > 0) {
                 tableOfContentsHtml = `
         <nav class="table-of-contents">
             <h2>Table of Contents</h2>
             <ol>
 `;
-                this.poems.forEach(poem => {
+                this.packets.forEach(packet => {
                     tableOfContentsHtml += `
-                <li><a href="#poem-${poem.id}">${this.escapeHtml(poem.title)}</a></li>
+                <li><a href="#packet-${packet.id}">${this.escapeHtml(packet.title)}</a></li>
 `;
                 });
                 tableOfContentsHtml += `
@@ -1123,35 +1123,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Combined Poems</title>
+    <title>Combined Packets</title>
     <style>
         body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 2em auto; padding: 0 1em; color: #333; }
         h1, h2, h3 { color: #2c3e50; margin-top: 1.5em; margin-bottom: 0.5em; }
         h1 { font-size: 2.2em; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 0.5em; }
         h2 { font-size: 1.8em; }
         h3 { font-size: 1.4em; }
-        .poem-section { margin-bottom: 2em; padding-bottom: 1em; border-bottom: 1px dashed #eee; }
-        .poem-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .packet-section { margin-bottom: 2em; padding-bottom: 1em; border-bottom: 1px dashed #eee; }
+        .packet-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         /* Mammoth.js often wraps content in paragraphs, so default to no top margin */
-        .poem-content p { margin-top: 0; margin-bottom: 0.5em; }
+        .packet-content p { margin-top: 0; margin-bottom: 0.5em; }
         /* Ensure line breaks are visible if they are represented as <br> */
-        .poem-content br {
+        .packet-content br {
             display: block;
             content: "";
             margin-top: 0.5em; /* Adds vertical space for line breaks */
         }
-        .poem-content pre { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; }
-        .poem-content code { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; }
+        .packet-content pre { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; }
+        .packet-content code { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; }
         /* Basic alignment from Mammoth.js output */
         p[align="center"] { text-align: center; }
         p[align="right"] { text-align: right; }
-        /* Preserve white-space for pre-formatted poem lines */
-        .poem-content pre { white-space: pre-wrap; word-wrap: break-word; }
-        .poem-content code { white-space: pre-wrap; word-wrap: break-word; }
+        /* Preserve white-space for pre-formatted packet lines */
+        .packet-content pre { white-space: pre-wrap; word-wrap: break-word; }
+        .packet-content code { white-space: pre-wrap; word-wrap: break-word; }
         /* Ensure other block elements like div maintain spacing */
-        .poem-content > div { margin-bottom: 0.5em; }
+        .packet-content > div { margin-bottom: 0.5em; }
         /* Basic image styling */
-        .poem-content img { max-width: 100%; height: auto; display: block; margin: 0.5em auto; }
+        .packet-content img { max-width: 100%; height: auto; display: block; margin: 0.5em auto; }
 
         /* Table of Contents Styling */
         .table-of-contents {
@@ -1186,18 +1186,18 @@
     </style>
 </head>
 <body>
-    <h1>Combined Poems</h1>
+    <h1>Combined Packets</h1>
     ${tableOfContentsHtml}
-    <div class="poems-container">
+    <div class="packets-container">
 `;
 
-            this.poems.forEach((poem, index) => {
+            this.packets.forEach((packet, index) => {
                 combinedHtml += `
-        <div class="poem-section" id="poem-${poem.id}">
-            <h2>${this.escapeHtml(poem.title)}</h2>
-            <p class="poem-metadata"><em>Source: ${this.escapeHtml(poem.filename)} | Words: ${poem.wordCount}</em></p>
-            <div class="poem-content">
-                ${poem.htmlContent}
+        <div class="packet-section" id="packet-${packet.id}">
+            <h2>${this.escapeHtml(packet.title)}</h2>
+            <p class="packet-metadata"><em>Source: ${this.escapeHtml(packet.filename)} | Words: ${packet.wordCount}</em></p>
+            <div class="packet-content">
+                ${packet.htmlContent}
             </div>
         </div>
 `;
@@ -1212,7 +1212,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'Combined_Poems.html'; // Ensure it's an HTML file
+            a.download = 'Combined_Packets.html'; // Ensure it's an HTML file
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1305,9 +1305,9 @@
         }
     }
 
-    // Initialize the PoemCompiler once the DOM is fully loaded
+    // Initialize the PacketCompiler once the DOM is fully loaded
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM Content Loaded. Initializing PoemCompiler.');
-        new PoemCompiler();
+        console.log('DOM Content Loaded. Initializing PacketCompiler.');
+        new PacketCompiler();
     });
 })();
