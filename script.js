@@ -1192,12 +1192,34 @@
 `;
 
             this.packets.forEach((packet, index) => {
+                let cleanedHtmlContent = packet.htmlContent;
+                const tempContentDiv = document.createElement('div');
+                tempContentDiv.innerHTML = packet.htmlContent;
+
+                // Check if the packet's title (or a very similar version) is the first heading in its htmlContent
+                const firstHeading = tempContentDiv.querySelector('h1, h2, h3');
+                if (firstHeading) {
+                    const normalizedTitle = packet.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const normalizedHeadingText = firstHeading.textContent.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                    // Use a more robust check for similarity
+                    // Check if the heading text is a significant portion of the packet title or vice-versa
+                    const isSimilar = normalizedTitle.includes(normalizedHeadingText) || normalizedHeadingText.includes(normalizedTitle);
+                    const isExactMatch = normalizedTitle === normalizedHeadingText;
+
+                    if (isExactMatch || (isSimilar && firstHeading.textContent.trim().length > 0)) {
+                        console.log(`Removing duplicate heading "${firstHeading.textContent.trim()}" from packet "${packet.title}" for export.`);
+                        firstHeading.remove();
+                        cleanedHtmlContent = tempContentDiv.innerHTML;
+                    }
+                }
+
                 combinedHtml += `
         <div class="packet-section" id="packet-${packet.id}">
             <h2>${this.escapeHtml(packet.title)}</h2>
             <p class="packet-metadata"><em>Source: ${this.escapeHtml(packet.filename)} | Words: ${packet.wordCount}</em></p>
             <div class="packet-content">
-                ${packet.htmlContent}
+                ${cleanedHtmlContent}
             </div>
         </div>
 `;
