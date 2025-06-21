@@ -176,59 +176,63 @@
             </summary>
             <div class="prose max-w-none text-gray-700 mt-4">
                 <p class="mb-4">
-                    Welcome, faculty members! This Packet Compiler is designed to help you organize and distribute course materials efficiently. By converting your Word documents (.docx) into a single, navigable HTML file, it simplifies content delivery for your students. To get the most accurate and organized results, consider the following formatting guidelines for your source documents:
+                    This tool helps you turn Word documents (.docx) into a single, easy-to-navigate HTML file for your students. Follow these simple tips to get clean, organized results: 
                 </p>
 
                 <h3 class="text-lg font-semibold mb-2">Use Heading Styles for Best Results</h3>
+                <p>
+                    Before you upload your documents, make sure to apply Word’s built-in heading styles (Heading 1, 2, 3) to title each major section that you wish to combine.  These headings will: 
+                </p>
                 <ul class="list-disc list-inside mb-4 space-y-1">
-                    <li>The tool works best when you use Word's built-in heading styles (e.g., Heading 1, Heading 2, Heading 3) to title your sections or "packets" within a document. For example, if you have multiple readings or concepts within one Word file, mark each new item with a Heading style.</li>
-                    <li>The text you apply a heading style to will be used as the title for each "packet" in the compiled document and in the Table of Contents. Make these titles concise and descriptive.</li>
-                    <li>The compiler primarily uses these headings to identify where one packet ends and another begins. This is the most reliable method for multi-packet extraction.</li>
+                    <li>Become titles that will appear in the Table of Contents </li>
+                    <li>Tell the compiler where one section ends and another begins </li>
+                    <li>Work more reliably than any other method </li>
+                    <li>Keep titles clear and concise for easy navigation. </li>
                 </ul>
 
                 <h3 class="text-lg font-semibold mb-2">Alternative Section Breaks (if needed)</h3>
                 <p class="mb-2">
-                    While headings are preferred, the tool can also attempt to identify packets using other patterns if no headings are present or if you wish to split content differently:
+                    If you don’t use headings, the tool can try to separate content by: 
                 </p>
                 <ul class="list-disc list-inside mb-4 space-y-1">
-                    <li>You can use a line of three or more asterisks (***), hyphens (---), underscores (___), equals signs (===), or tildes (~~~) on a blank line to explicitly separate content. These should be on their own line, ideally centered, to be most effective.</li>
-                    <li>Two or more consecutive empty paragraphs (just pressing Enter/Return twice or more) can also signal a new packet. This method is less reliable and should be a last resort.</li>
+                    <li>Line separators like ```, ---, ___, ===, or ~~~ (on a line by themselves) </li>
+                    <li>Multiple blank lines (pressing Enter twice or more) </li>
                 </ul>
                 <p class="mb-4 text-sm text-red-700">
-                    Warning: Relying solely on explicit separators or empty paragraphs for splitting can sometimes lead to less accurate packet identification, especially with inconsistent document formatting. Headings are always recommended.
+                    Note: These methods are less accurate than headings and may not work well if formatting is inconsistent. 
                 </p>
 
                 <h3 class="text-lg font-semibold mb-2">One or More Sources of Content the uploaded files</h3>
                 <ul class="list-disc list-inside mb-4 space-y-1">
-                    <li>If your .docx file contains only one distinct piece of content (e.g., a single lecture note or reading), the tool will treat the entire document as one packet. It will attempt to derive a title from the first meaningful text, or use the filename.</li>
-                    <li>If your .docx file contains several distinct sections (e.g., Week 1 Readings, Week 2 Readings) that you want treated as individual, reorderable "packets," use the heading structure or explicit separators as described above.</li>
+                    <li>If there aren’t multiple sources of content in the source file (e.g., multiple poems, sections, chapters, etc, in the file you’re uploading), then no headings are needed—the tool will use the filename or first lines as the title. </li>
+                    <li>If there are multiple sources of content in the source file, then use heading styles to define each one clearly. </li>
                     <li>You can upload multiple .docx files simultaneously, and the tool will process each one independently to extract packets. All extracted packets from all uploaded files will be added to the same list for combining.</li>
-                    <li>You can also upload additional .docx files even after you've already processed some. New packets will be added to the existing list, allowing you to compile content from various sources over time.</li>
+                    <li>You can also upload additional .docx files even after you’ve already processed some. New packets will be added to the existing list, allowing you to compile content from various sources over time.</li>
                 </ul>
 
-                <h3 class="text-lg font-semibold mb-2">What to Expect in the Output HTML</h3>
+                <h3 class="text-lg font-semibold mb-2">What the Final HTML Will Include</h3>
                 <ul class="list-disc list-inside mb-4 space-y-1">
-                    <li>The exported HTML will include an interactive Table of Contents at the top, allowing students to quickly navigate to specific packets.</li>
-                    <li>The title you see in the Table of Contents and at the start of each packet section will be derived from your document's headings or inferred. If the extracted content already contains that exact heading as its first element, the tool will attempt to remove the duplicate for a cleaner presentation.</li>
-                    <li>The tool aims to preserve basic formatting (bold, italics, lists, tables, images, hyperlinks) as much as possible, converting it from Word to HTML. Complex layouts or advanced Word features might not translate perfectly.</li>
-                    <li>Images are embedded directly into the HTML (Base64 encoded), ensuring they appear correctly without needing separate files.</li>
+                    <li>Interactive Table of Contents at the top of the exported html document. </li>
+                    <li>Preserved formatting of the original content for bold, italics, lists, tables, images, and links </li>
+                    <li>Images included, no separate files needed </li>
                 </ul>
 
-                <h3 class="text-lg font-semibold mb-2">General Usage Tips</h3>
+                <h3 class="text-lg font-semibold mb-2">Helpful Tips</h3>
                 <ul class="list-disc list-inside mb-4 space-y-1">
-                    <li>Use the "View" button next to each loaded packet to inspect its content and ensure it was extracted correctly before downloading the combined document.</li>
-                    <li>Drag and drop packets in the list, or use the up/down arrow buttons, to arrange them in your desired sequence for the final compiled document.</li>
-                    <li>If you're not satisfied with the packet breakdown, use the "Clear All" button to reset the tool and try uploading adjusted versions of your Word documents.</li>
-                    <li>While not critical for functionality, clear and consistent file names for your original .docx files can help you identify sources of packets easily in the tool.</li>
+                    <li>Preview content using the “View” button before downloading </li>
+                    <li>Reorder the content by dragging or using arrow buttons </li>
+                    <li>Reset if needed with “Clear All” and try again </li>
+                    <li>Use clear filenames to stay organized </li>
+                    <li>Once your HTML is compiled, feel free to copy and paste it into Word for further editing or to export as a PDF. </li>
                 </ul>
                 <p class="mb-4">
-                    We hope this tool assists you in creating highly accessible and organized learning materials. If you encounter any issues or have suggestions, please provide feedback!
+                    We're glad to support your teaching. Let us know if you have questions or feedback! 
                 </p>
             </div>
         </details>
     </div>
 
-    <script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
+    <script src="[https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js](https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js)"></script>
     <script src="script.js"></script>
 </body>
 </html>
