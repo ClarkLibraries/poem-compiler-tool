@@ -234,6 +234,7 @@
                     progressBar.setAttribute('aria-valuenow', Math.round(progress).toString());
                     console.log(`Progress: ${Math.round(progress)}%`);
 
+                    // Use requestAnimationFrame to ensure UI updates are rendered
                     await new Promise(resolve => requestAnimationFrame(resolve));
                 }
 
@@ -443,21 +444,24 @@
 
                 // Collect all elements between current heading and the next (or end of document)
                 const poemElements = allElements.slice(startIndex + 1, endIndex);
-                
+
                 // Filter out any empty text nodes or very short paragraphs that might be artifacts
-                const meaningfulElements = poemElements.filter(el => el.textContent.trim().length > 0 || el.tagName === 'BR');
+                const meaningfulElements = poemElements.filter(el => {
+                    // Check if element has actual content or is a line break
+                    return el.textContent.trim().length > 0 || el.tagName === 'BR' || el.tagName === 'P' && el.innerHTML.trim() === '&nbsp;';
+                });
 
                 if (meaningfulElements.length === 0) {
                     console.log(`    Skipping heading "${title}" as no content found before next heading/end.`);
                     continue;
                 }
 
-                const poemContent = meaningfulElements.map(el => {
-                    if (el.tagName === 'BR') return '\n'; // Preserve line breaks
-                    return el.textContent;
-                }).join('\n').trim();
-
+                // Preserve the structure and formatting as much as possible for htmlContent
                 const poemHtml = meaningfulElements.map(el => el.outerHTML).join('\n');
+                const poemContent = meaningfulElements.map(el => {
+                    // For plain text, convert <br> to newline, otherwise use textContent
+                    return el.tagName === 'BR' ? '\n' : el.textContent;
+                }).join('\n').trim();
 
                 if (poemContent.length > 10) { // Ensure there's substantial content
                     poems.push(this.createPoemObject(title, poemContent, poemHtml, filename));
@@ -491,11 +495,10 @@
 
                 // Heuristic for what might be a title: short, possibly bold/centered, starts with a capital letter
                 const mightBeTitle = text.length > 0 && text.length < 100 &&
-                    (p.querySelector('strong') || p.querySelector('b') ||
-                    p.style.textAlign === 'center' || /^[A-Z]/.test(text)); // Starts with a capital letter
+                    (p.querySelector('strong, b') || p.style.textAlign === 'center' || /^[A-Z][^a-z]*$/.test(text) || (text.length <= 50 && /^[A-Z]/.test(text))); // Starts with a capital letter and reasonable length, or all caps
 
                 // Heuristic for an empty line or a significant break: empty paragraph or very short and not clearly content
-                const isEmptyOrBreak = text.length === 0 || (text.length < 5 && currentPoemElements.length > 0 && !mightBeTitle);
+                const isEmptyOrBreak = text.length === 0 || (text.length < 5 && !mightBeTitle); // Consider only truly empty or very short paragraphs as breaks
 
                 if (isEmptyOrBreak) {
                     if (currentPoemElements.length > 0) {
@@ -503,7 +506,7 @@
                         const poemHtml = currentPoemElements.map(el => el.outerHTML).join('\n');
                         const title = currentTitle || `Poem ${poemIndex} from ${filename}`;
 
-                        if (poemContent.length > 10) {
+                        if (poemContent.length > 10) { // Ensure there's substantial content
                             poems.push(this.createPoemObject(title, poemContent, poemHtml, filename));
                             poemIndex++;
                             console.log(`    Poem #${poemIndex - 1} identified by paragraph break: "${title}"`);
@@ -556,7 +559,7 @@
                 const content = tempDiv.textContent.trim();
 
                 // If the part is just the separator itself or very short, skip it
-                if (content.length < 10) {
+                if (content.length < 10 && !tempDiv.querySelector('p')) { // Also check if it contains actual paragraphs
                     console.log(`    Skipping part ${index + 1} due to insufficient content after separator.`);
                     return;
                 }
@@ -744,12 +747,13 @@
             downloadBtn.disabled = false;
             clearBtn.disabled = false;
 
+            // Re-render poems based on the current order in this.poems array
             this.poems.forEach((poem, index) => {
                 const li = document.createElement('li');
                 li.className = 'poem-item bg-white p-4 shadow-sm rounded-lg flex items-center justify-between transition-all duration-200 ease-in-out';
                 li.draggable = true;
                 li.dataset.id = poem.id;
-                li.dataset.index = index;
+                li.dataset.index = index; // Important for reordering
 
                 li.innerHTML = `
                     <div class="flex-1 min-w-0">
@@ -788,7 +792,15 @@
                 return;
             }
 
+            // Remove existing listeners to prevent duplicates on updateDisplay calls
+            // This is crucial if updateDisplay is called multiple times.
+            // A more robust solution might use delegation for drag/drop or a library.
+            // For now, re-attaching is simpler given the current structure.
+            // In a real app, you'd manage these more carefully.
+
             poemsList.querySelectorAll('.view-poem-btn').forEach(button => {
+                // Ensure unique listeners by first removing and then adding.
+                // Using a named function for removal if needed, or simple direct assignment for one-off.
                 button.onclick = (e) => this.viewPoem(e.currentTarget.dataset.id);
             });
 
@@ -802,8 +814,8 @@
                 if (target) {
                     this.draggedIndex = parseInt(target.dataset.index, 10);
                     e.dataTransfer.effectAllowed = 'move';
-                    // Using setTimeout to prevent Firefox drag ghosting issue on the original element
-                    setTimeout(() => target.classList.add('dragging'), 0);
+                    e.dataTransfer.setData('text/plain', this.draggedIndex); // Set data for Firefox compatibility
+                    setTimeout(() => target.classList.add('dragging'), 0); // Add class after a tiny delay
                     console.log('Drag started for index:', this.draggedIndex);
                 }
             });
@@ -813,46 +825,74 @@
                 const target = e.target.closest('.poem-item');
                 if (target && target.dataset.index !== undefined && this.draggedIndex !== null) {
                     const dragOverIndex = parseInt(target.dataset.index, 10);
-                    if (this.draggedIndex !== dragOverIndex) {
-                        const draggedEl = poemsList.querySelector(`[data-index="${this.draggedIndex}"]`);
-                        if (draggedEl) {
-                            // Visually reorder elements for feedback
-                            if (dragOverIndex > this.draggedIndex) {
-                                target.parentNode.insertBefore(draggedEl, target.nextSibling);
-                            } else {
-                                target.parentNode.insertBefore(draggedEl, target);
+                    const draggedEl = poemsList.querySelector('.poem-item.dragging');
+
+                    if (draggedEl && this.draggedIndex !== dragOverIndex) {
+                        // Visual feedback: reorder the elements in the DOM
+                        const currentParent = target.parentNode;
+                        if (currentParent && draggedEl.parentNode === currentParent) { // Ensure they are siblings
+                             // Determine if dragging above or below
+                            const targetRect = target.getBoundingClientRect();
+                            const mouseY = e.clientY;
+                            const targetMidY = targetRect.top + targetRect.height / 2;
+
+                            if (mouseY < targetMidY && draggedEl !== target.previousElementSibling) {
+                                currentParent.insertBefore(draggedEl, target);
+                            } else if (mouseY >= targetMidY && draggedEl !== target.nextElementSibling) {
+                                currentParent.insertBefore(draggedEl, target.nextSibling);
                             }
-                            // Temporarily update data-index to reflect new visual order for next dragover
-                            // This is a common but tricky part of drag-and-drop reordering.
-                            // A more robust solution might involve direct manipulation of the underlying array and re-rendering.
-                            // For simplicity, we'll rely on the 'drop' event to finalize.
                         }
                     }
                 }
             });
 
             poemsList.addEventListener('dragleave', (e) => {
-                // Not strictly necessary for simple reordering, but good practice
-                // to remove any visual indicators if dragged item leaves the list area.
+                // No specific action needed here for this simple reorder logic
             });
 
             poemsList.addEventListener('drop', (e) => {
                 this.preventDefaults(e);
                 const target = e.target.closest('.poem-item');
-                if (target && this.draggedIndex !== null) {
+                const draggedEl = poemsList.querySelector('.poem-item.dragging'); // Get the element still marked as dragging
+
+                if (draggedEl && target && this.draggedIndex !== null) {
                     const dropIndex = parseInt(target.dataset.index, 10);
-                    console.log(`Drop detected. Dragged Index: ${this.draggedIndex}, Dropped onto Index: ${dropIndex}`);
+                    const currentVisualIndex = parseInt(draggedEl.dataset.index, 10); // Get its current DOM index before array change
 
-                    // Finalize the reordering in the actual poems array
-                    const [draggedPoem] = this.poems.splice(this.draggedIndex, 1);
-                    this.poems.splice(dropIndex, 0, draggedPoem);
+                    if (this.draggedIndex !== dropIndex) { // Only reorder if drop position is different
+                        console.log(`Drop detected. Original Dragged Index: ${this.draggedIndex}, Dropped onto Visual Index: ${dropIndex}`);
 
-                    this.showNotification(`Reordered poem "${draggedPoem.title}"`, 'info');
-                    this.announceToScreenReader('poem-list-status', `Poem ${draggedPoem.title} moved to position ${dropIndex + 1}.`);
+                        // Reorder the underlying poems array
+                        const [draggedPoem] = this.poems.splice(this.draggedIndex, 1);
+                        // The `dropIndex` from the target element now represents the correct insertion point
+                        // in the *original* array context after removing the dragged item.
+                        // However, because we visually reordered, the `dropIndex` of the target might have shifted.
+                        // The most reliable way is to find the index of the *dragged element after the visual reordering*.
+                        let newIndex = Array.from(poemsList.children).indexOf(draggedEl);
+                        if (newIndex === -1) { // Fallback if not found (shouldn't happen with correct dragover)
+                            newIndex = dropIndex;
+                        }
 
+                        this.poems.splice(newIndex, 0, draggedPoem);
+
+                        this.showNotification(`Reordered poem "${draggedPoem.title}"`, 'info');
+                        this.announceToScreenReader('poem-list-status', `Poem ${draggedPoem.title} moved to position ${newIndex + 1}.`);
+
+                        this.draggedIndex = null; // Reset
+                        draggedEl.classList.remove('dragging'); // Remove dragging class
+
+                        // Re-render the list to reflect the new order and update data-index attributes correctly
+                        // This is crucial because data-index attributes need to match the array indices.
+                        this.updateDisplay();
+                    } else {
+                        console.log('Poem dropped on its original position. No reordering needed.');
+                        this.draggedIndex = null;
+                        draggedEl.classList.remove('dragging');
+                    }
+                } else if (draggedEl) {
+                    // If dropped outside a valid target, just remove dragging class
+                    draggedEl.classList.remove('dragging');
                     this.draggedIndex = null;
-                    // Re-render the list to reflect the new order and update data-index attributes correctly
-                    this.updateDisplay();
                 }
             });
 
@@ -912,18 +952,21 @@
                 modal.setAttribute('aria-hidden', 'false');
                 modal.focus(); // Focus the modal for accessibility
 
-                closeModalBtn.onclick = () => {
+                const closeHandler = () => {
                     modal.classList.add('hidden');
                     modal.setAttribute('aria-hidden', 'true');
                     // Return focus to the button that opened the modal if possible
                     document.querySelector(`button[data-id="${id}"]`)?.focus();
+                    closeModalBtn.removeEventListener('click', closeHandler); // Clean up listener
+                    document.removeEventListener('keydown', handleEscape);
                 };
+
+                closeModalBtn.addEventListener('click', closeHandler);
 
                 // Close modal on escape key
                 const handleEscape = (e) => {
                     if (e.key === 'Escape') {
-                        closeModalBtn.click();
-                        document.removeEventListener('keydown', handleEscape);
+                        closeHandler();
                     }
                 };
                 document.addEventListener('keydown', handleEscape);
@@ -945,7 +988,7 @@
                 return;
             }
 
-            console.log('Preparing combined document for download.');
+            console.log('Preparing combined HTML document for download.');
             let combinedHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -961,10 +1004,24 @@
         .poem-section { margin-bottom: 2em; padding-bottom: 1em; border-bottom: 1px dashed #eee; }
         .poem-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         p { margin-bottom: 0.5em; }
+        /* Preserve line breaks and white-space for poetry within paragraphs and other block elements */
+        .poem-content p, .poem-content div { 
+            white-space: pre-wrap; 
+            margin-top: 0; 
+            margin-bottom: 0.5em; /* Small margin for paragraph separation */
+        }
+        /* Ensure line breaks are visible if they are represented as <br> */
+        .poem-content br { 
+            display: block; 
+            content: ""; 
+            margin-top: 0.5em; /* Adds vertical space for line breaks */
+        }
         .poem-metadata { font-size: 0.9em; color: #777; margin-top: -0.5em; margin-bottom: 1em; }
-        pre { background-color: #f4f4f4; padding: 1em; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
-        /* Preserve line breaks for poetry if not already in paragraphs */
-        .poem-content { white-space: pre-wrap; } 
+        strong, b { font-weight: bold; }
+        em, i { font-style: italic; }
+        /* Basic alignment from Mammoth.js output */
+        p[align="center"] { text-align: center; }
+        p[align="right"] { text-align: right; }
     </style>
 </head>
 <body>
@@ -972,11 +1029,11 @@
     <div class="poems-container">
 `;
 
-            this.poems.forEach(poem => {
+            this.poems.forEach((poem, index) => {
                 combinedHtml += `
-        <div class="poem-section">
+        <div class="poem-section" id="poem-${poem.id}">
             <h2>${this.escapeHtml(poem.title)}</h2>
-            <p class="poem-metadata"><em>From: ${this.escapeHtml(poem.filename)} | Words: ${poem.wordCount}</em></p>
+            <p class="poem-metadata"><em>Source: ${this.escapeHtml(poem.filename)} | Words: ${poem.wordCount}</em></p>
             <div class="poem-content">
                 ${poem.htmlContent}
             </div>
@@ -993,13 +1050,13 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'Combined_Poems.html';
+            a.download = 'Combined_Poems.html'; // Ensure it's an HTML file
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            this.showNotification('Combined document downloaded!', 'success');
-            this.announceToScreenReader('process-status', 'Combined document downloaded.');
+            this.showNotification('Combined document downloaded as HTML!', 'success');
+            this.announceToScreenReader('process-status', 'Combined document downloaded as HTML.');
             console.log('Combined document download initiated.');
         }
 
