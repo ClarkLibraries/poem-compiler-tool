@@ -1097,6 +1097,27 @@
             }
 
             console.log('Preparing combined HTML document for download.');
+
+            // Generate Table of Contents
+            let tableOfContentsHtml = '';
+            if (this.poems.length > 0) {
+                tableOfContentsHtml = `
+        <nav class="table-of-contents">
+            <h2>Table of Contents</h2>
+            <ol>
+`;
+                this.poems.forEach(poem => {
+                    tableOfContentsHtml += `
+                <li><a href="#poem-${poem.id}">${this.escapeHtml(poem.title)}</a></li>
+`;
+                });
+                tableOfContentsHtml += `
+            </ol>
+        </nav>
+`;
+            }
+
+
             let combinedHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1131,10 +1152,42 @@
         .poem-content > div { margin-bottom: 0.5em; }
         /* Basic image styling */
         .poem-content img { max-width: 100%; height: auto; display: block; margin: 0.5em auto; }
+
+        /* Table of Contents Styling */
+        .table-of-contents {
+            margin: 2em 0;
+            padding: 1em;
+            border: 1px solid #eee;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .table-of-contents h2 {
+            margin-top: 0;
+            font-size: 1.5em;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 0.5em;
+            margin-bottom: 1em;
+        }
+        .table-of-contents ol {
+            list-style: decimal;
+            padding-left: 2em;
+        }
+        .table-of-contents li {
+            margin-bottom: 0.5em;
+        }
+        .table-of-contents a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .table-of-contents a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <h1>Combined Poems</h1>
+    ${tableOfContentsHtml}
     <div class="poems-container">
 `;
 
