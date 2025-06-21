@@ -386,7 +386,7 @@
 
             // Strategy 2: Split by multiple line breaks or page breaks (empty paragraphs)
             const paragraphs = Array.from(tempDiv.querySelectorAll('p'));
-            if (paragraphs.length > 3) {
+            if (paragraphs.length > 3) { // Ensure there are enough paragraphs to consider separation
                 const extractedPoems = this.extractPoemsByParagraphSeparation(tempDiv, filename, paragraphs);
                 if (extractedPoems.length > 1) {
                     console.log(`Strategy 2 (Paragraph Separation) found ${extractedPoems.length} poems.`);
@@ -395,14 +395,14 @@
             }
 
             // Strategy 3: Split by patterns like "***", "---", or similar visual separators
-            const textContent = tempDiv.textContent;
             const separatorPatterns = [
-                /\n\s*\*{3,}\s*\n/g,
-                /\n\s*-{3,}\s*\n/g,
-                /\n\s*_{3,}\s*\n/g,
-                /\n\s*={3,}\s*\n/g,
-                /\n\s*~{3,}\s*\n/g,
-                /\n\s*\n\s*\n\s*\n/g
+                /\n\s*\*{3,}\s*\n/g, // ***
+                /\n\s*-{3,}\s*\n/g, // ---
+                /\n\s*_{3,}\s*\n/g, // ___
+                /\n\s*={3,}\s*\n/g, // ===
+                /\n\s*~{3,}\s*\n/g, // ~~~
+                /(<p>\s*&nbsp;\s*<\/p>){2,}/g, // Multiple empty paragraphs (mammoth often produces &nbsp;)
+                /(<p>\s*<\/p>){2,}/g // Multiple empty paragraphs
             ];
 
             for (const pattern of separatorPatterns) {
@@ -441,11 +441,25 @@
                 const startIndex = allElements.indexOf(currentHeading);
                 const endIndex = nextHeading ? allElements.indexOf(nextHeading) : allElements.length;
 
+                // Collect all elements between current heading and the next (or end of document)
                 const poemElements = allElements.slice(startIndex + 1, endIndex);
-                const poemContent = poemElements.map(el => el.textContent).join('\n').trim();
-                const poemHtml = poemElements.map(el => el.outerHTML).join('\n');
+                
+                // Filter out any empty text nodes or very short paragraphs that might be artifacts
+                const meaningfulElements = poemElements.filter(el => el.textContent.trim().length > 0 || el.tagName === 'BR');
 
-                if (poemContent.length > 10) {
+                if (meaningfulElements.length === 0) {
+                    console.log(`    Skipping heading "${title}" as no content found before next heading/end.`);
+                    continue;
+                }
+
+                const poemContent = meaningfulElements.map(el => {
+                    if (el.tagName === 'BR') return '\n'; // Preserve line breaks
+                    return el.textContent;
+                }).join('\n').trim();
+
+                const poemHtml = meaningfulElements.map(el => el.outerHTML).join('\n');
+
+                if (poemContent.length > 10) { // Ensure there's substantial content
                     poems.push(this.createPoemObject(title, poemContent, poemHtml, filename));
                 } else {
                     console.log(`    Skipping heading "${title}" due to insufficient content.`);
@@ -473,12 +487,15 @@
             for (let i = 0; i < paragraphs.length; i++) {
                 const p = paragraphs[i];
                 const text = p.textContent.trim();
+                const html = p.outerHTML;
 
+                // Heuristic for what might be a title: short, possibly bold/centered, starts with a capital letter
                 const mightBeTitle = text.length > 0 && text.length < 100 &&
                     (p.querySelector('strong') || p.querySelector('b') ||
-                     p.style.textAlign === 'center' || /^[A-Z][^.!?]*$/.test(text));
+                    p.style.textAlign === 'center' || /^[A-Z]/.test(text)); // Starts with a capital letter
 
-                const isEmptyOrBreak = text.length === 0 || (text.length < 10 && currentPoemElements.length > 0);
+                // Heuristic for an empty line or a significant break: empty paragraph or very short and not clearly content
+                const isEmptyOrBreak = text.length === 0 || (text.length < 5 && currentPoemElements.length > 0 && !mightBeTitle);
 
                 if (isEmptyOrBreak) {
                     if (currentPoemElements.length > 0) {
@@ -496,8 +513,10 @@
                         currentPoemElements = [];
                         currentTitle = '';
                     }
+                    // If multiple empty paragraphs, consider it a strong separator, do not add the empty p to content
                 } else if (mightBeTitle && currentPoemElements.length === 0) {
                     currentTitle = text;
+                    // Add this potential title paragraph to the current poem elements, as it's part of its structure
                     currentPoemElements.push(p);
                     console.log(`    Potential title detected: "${text}"`);
                 } else {
@@ -505,6 +524,7 @@
                 }
             }
 
+            // Add any remaining poem elements after the loop finishes
             if (currentPoemElements.length > 0) {
                 const poemContent = currentPoemElements.map(el => el.textContent).join('\n').trim();
                 const poemHtml = currentPoemElements.map(el => el.outerHTML).join('\n');
@@ -535,21 +555,49 @@
                 tempDiv.innerHTML = part.trim();
                 const content = tempDiv.textContent.trim();
 
-                if (content.length > 10) {
+                // If the part is just the separator itself or very short, skip it
+                if (content.length < 10) {
+                    console.log(`    Skipping part ${index + 1} due to insufficient content after separator.`);
+                    return;
+                }
+
+                // Attempt to find a title within this part, prioritizing headings or bold/centered text
+                let title = '';
+                const headings = tempDiv.querySelectorAll('h1, h2, h3');
+                if (headings.length > 0) {
+                    title = headings[0].textContent.trim();
+                } else {
+                    const paragraphs = tempDiv.querySelectorAll('p');
+                    if (paragraphs.length > 0) {
+                        const firstParaText = paragraphs[0].textContent.trim();
+                        if (firstParaText.length > 0 && firstParaText.length < 150) {
+                            const isBold = paragraphs[0].querySelector('strong, b') !== null;
+                            const isCentered = paragraphs[0].style.textAlign === 'center';
+                            if (isBold || isCentered) {
+                                title = firstParaText;
+                            }
+                        }
+                    }
+                }
+
+                if (!title) {
+                    // Fallback to first non-empty line as title if no clear title found
                     const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
                     const firstLine = lines[0] || '';
-                    const title = (firstLine.length > 0 && firstLine.length < 100) ?
-                        firstLine : `Poem ${index + 1} from ${filename}`;
-
-                    poems.push(this.createPoemObject(title, content, part.trim(), filename));
-                    console.log(`    Poem #${index + 1} identified by separator: "${title}"`);
-                } else {
-                    console.log(`    Skipping part ${index + 1} due to insufficient content after separator.`);
+                    if (firstLine.length > 0 && firstLine.length < 100) {
+                        title = firstLine;
+                    } else {
+                        title = `Poem ${index + 1} from ${filename}`;
+                    }
                 }
+
+                poems.push(this.createPoemObject(title, content, part.trim(), filename));
+                console.log(`    Poem #${index + 1} identified by separator: "${title}"`);
             });
             console.log(`  Finished separator extraction. Found ${poems.length} poems.`);
             return poems;
         }
+
 
         /**
          * Creates a single poem object from an entire document when multiple poems are not detected.
@@ -606,6 +654,7 @@
             let title = '';
             console.log(`Attempting to extract title for "${filename}".`);
 
+            // Prioritize actual heading tags
             const headings = tempDiv.querySelectorAll('h1, h2, h3');
             for (let i = 0; i < headings.length; i++) {
                 const hText = headings[i].textContent.trim();
@@ -616,6 +665,7 @@
                 }
             }
 
+            // If no heading, check first few paragraphs for bold/centered text
             if (!title) {
                 const paragraphs = tempDiv.querySelectorAll('p');
                 for (let i = 0; i < Math.min(3, paragraphs.length); i++) {
@@ -634,6 +684,7 @@
                 }
             }
 
+            // As a last resort, use the first non-empty line of content or filename
             if (!title) {
                 const paragraphs = tempDiv.querySelectorAll('p');
                 if (paragraphs.length > 0) {
@@ -653,255 +704,391 @@
                 console.log(`  Title falling back to cleaned filename: "${title}"`);
             }
 
-            title = title.replace(/\s+/g, ' ').trim();
-            if (title.length > 150) {
-                title = title.substring(0, 147) + '...';
-            }
-
-            if (!title) {
-                title = "Untitled Poem";
-                console.log(`  Title defaulted to "Untitled Poem".`);
-            }
             return title;
         }
 
         /**
-         * Updates the display of loaded poems and their count.
-         * Attaches drag-and-drop and button event listeners to each poem element.
+         * Updates the display of loaded poems in the UI.
+         * Enables/disables the download button based on poem count.
+         * Re-initializes drag-and-drop for poem reordering.
          */
         updateDisplay() {
-            console.log('Updating display. Current poem count:', this.poems.length);
-            const poemList = document.getElementById('poemList');
-            const poemCountSpan = document.getElementById('poemCount');
+            console.log('Updating display for poems. Total poems:', this.poems.length);
+            const poemsList = document.getElementById('poemsList');
             const downloadBtn = document.getElementById('downloadBtn');
             const clearBtn = document.getElementById('clearBtn');
+            const placeholder = document.getElementById('poemsPlaceholder');
+            const poemCountSpan = document.getElementById('poemCount');
 
-            if (!poemList || !poemCountSpan || !downloadBtn || !clearBtn) {
-                console.error('Required DOM elements for display not found. Please ensure all IDs are correct in the HTML.');
+            if (!poemsList || !downloadBtn || !clearBtn || !placeholder || !poemCountSpan) {
+                console.error('Required DOM elements for display update not found.');
+                this.showNotification('Application display error: Some UI elements are missing. Please check the HTML.', 'error', 0);
                 return;
             }
 
-            poemCountSpan.textContent = this.poems.length;
+            poemsList.innerHTML = ''; // Clear existing list
+            poemCountSpan.textContent = this.poems.length.toString();
 
             if (this.poems.length === 0) {
-                poemList.innerHTML = '<div class="no-poems">No poems loaded yet. Upload Word documents to get started!</div>';
+                placeholder.style.display = 'block';
+                poemsList.style.display = 'none';
                 downloadBtn.disabled = true;
                 clearBtn.disabled = true;
+                this.announceToScreenReader('poem-list-status', 'No poems loaded.');
+                console.log('No poems to display. Placeholder shown, buttons disabled.');
                 return;
             }
 
+            placeholder.style.display = 'none';
+            poemsList.style.display = 'block';
             downloadBtn.disabled = false;
             clearBtn.disabled = false;
 
-            poemList.innerHTML = this.poems.map((poem, index) => `
-                <div class="poem-item" data-index="${index}" draggable="true">
-                    <div class="poem-header">
-                        <h3 class="poem-title">${this.escapeHtml(poem.title)}</h3>
-                        <div class="poem-meta">
-                            <span class="word-count">${poem.wordCount} words</span>
-                            <span class="source-file">${this.escapeHtml(poem.filename)}</span>
-                        </div>
-                        <button class="remove-btn" data-index="${index}" title="Remove this poem">×</button>
+            this.poems.forEach((poem, index) => {
+                const li = document.createElement('li');
+                li.className = 'poem-item bg-white p-4 shadow-sm rounded-lg flex items-center justify-between transition-all duration-200 ease-in-out';
+                li.draggable = true;
+                li.dataset.id = poem.id;
+                li.dataset.index = index;
+
+                li.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-lg font-semibold text-gray-800 truncate">${this.escapeHtml(poem.title)}</h3>
+                        <p class="text-sm text-gray-500 truncate">${this.escapeHtml(poem.filename)} - ${poem.wordCount} words</p>
                     </div>
-                    <div class="poem-content">${poem.content.substring(0, 200)}${poem.content.length > 200 ? '...' : ''}</div>
-                </div>
-            `).join('');
+                    <div class="flex items-center space-x-2 ml-4">
+                        <button type="button" class="view-poem-btn p-2 rounded-full text-blue-600 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50" aria-label="View poem ${this.escapeHtml(poem.title)}" data-id="${poem.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        <button type="button" class="remove-poem-btn p-2 rounded-full text-red-600 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50" aria-label="Remove poem ${this.escapeHtml(poem.title)}" data-id="${poem.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                poemsList.appendChild(li);
+            });
 
-            // Add drag and drop event listeners
-            this.addDragAndDropListeners();
-            
-            // Add remove button event listeners
-            this.addRemoveButtonListeners();
+            this.addPoemListEventListeners();
+            this.announceToScreenReader('poem-list-status', `${this.poems.length} poems loaded. Use drag and drop to reorder.`);
+            console.log('Poem list rendered and event listeners added.');
         }
 
         /**
-         * Adds drag and drop event listeners to poem items for reordering.
+         * Adds event listeners for viewing, removing, and reordering poems.
          */
-        addDragAndDropListeners() {
-            const poemItems = document.querySelectorAll('.poem-item');
-            
-            poemItems.forEach((item, index) => {
-                item.addEventListener('dragstart', (e) => {
-                    this.draggedIndex = index;
+        addPoemListEventListeners() {
+            const poemsList = document.getElementById('poemsList');
+            if (!poemsList) {
+                console.error('Poem list element not found for event listeners.');
+                return;
+            }
+
+            poemsList.querySelectorAll('.view-poem-btn').forEach(button => {
+                button.onclick = (e) => this.viewPoem(e.currentTarget.dataset.id);
+            });
+
+            poemsList.querySelectorAll('.remove-poem-btn').forEach(button => {
+                button.onclick = (e) => this.removePoem(e.currentTarget.dataset.id);
+            });
+
+            // Drag and Drop for reordering
+            poemsList.addEventListener('dragstart', (e) => {
+                const target = e.target.closest('.poem-item');
+                if (target) {
+                    this.draggedIndex = parseInt(target.dataset.index, 10);
                     e.dataTransfer.effectAllowed = 'move';
-                    item.classList.add('dragging');
-                });
+                    // Using setTimeout to prevent Firefox drag ghosting issue on the original element
+                    setTimeout(() => target.classList.add('dragging'), 0);
+                    console.log('Drag started for index:', this.draggedIndex);
+                }
+            });
 
-                item.addEventListener('dragend', () => {
-                    item.classList.remove('dragging');
-                    this.draggedIndex = null;
-                });
-
-                item.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                });
-
-                item.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    if (this.draggedIndex !== null && this.draggedIndex !== index) {
-                        this.reorderPoems(this.draggedIndex, index);
+            poemsList.addEventListener('dragover', (e) => {
+                this.preventDefaults(e); // Allow drop
+                const target = e.target.closest('.poem-item');
+                if (target && target.dataset.index !== undefined && this.draggedIndex !== null) {
+                    const dragOverIndex = parseInt(target.dataset.index, 10);
+                    if (this.draggedIndex !== dragOverIndex) {
+                        const draggedEl = poemsList.querySelector(`[data-index="${this.draggedIndex}"]`);
+                        if (draggedEl) {
+                            // Visually reorder elements for feedback
+                            if (dragOverIndex > this.draggedIndex) {
+                                target.parentNode.insertBefore(draggedEl, target.nextSibling);
+                            } else {
+                                target.parentNode.insertBefore(draggedEl, target);
+                            }
+                            // Temporarily update data-index to reflect new visual order for next dragover
+                            // This is a common but tricky part of drag-and-drop reordering.
+                            // A more robust solution might involve direct manipulation of the underlying array and re-rendering.
+                            // For simplicity, we'll rely on the 'drop' event to finalize.
+                        }
                     }
-                });
+                }
             });
-        }
 
-        /**
-         * Adds event listeners to remove buttons for each poem.
-         */
-        addRemoveButtonListeners() {
-            const removeButtons = document.querySelectorAll('.remove-btn');
-            removeButtons.forEach(button => {
-                button.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const index = parseInt(button.dataset.index);
-                    this.removePoem(index);
-                });
+            poemsList.addEventListener('dragleave', (e) => {
+                // Not strictly necessary for simple reordering, but good practice
+                // to remove any visual indicators if dragged item leaves the list area.
             });
+
+            poemsList.addEventListener('drop', (e) => {
+                this.preventDefaults(e);
+                const target = e.target.closest('.poem-item');
+                if (target && this.draggedIndex !== null) {
+                    const dropIndex = parseInt(target.dataset.index, 10);
+                    console.log(`Drop detected. Dragged Index: ${this.draggedIndex}, Dropped onto Index: ${dropIndex}`);
+
+                    // Finalize the reordering in the actual poems array
+                    const [draggedPoem] = this.poems.splice(this.draggedIndex, 1);
+                    this.poems.splice(dropIndex, 0, draggedPoem);
+
+                    this.showNotification(`Reordered poem "${draggedPoem.title}"`, 'info');
+                    this.announceToScreenReader('poem-list-status', `Poem ${draggedPoem.title} moved to position ${dropIndex + 1}.`);
+
+                    this.draggedIndex = null;
+                    // Re-render the list to reflect the new order and update data-index attributes correctly
+                    this.updateDisplay();
+                }
+            });
+
+            poemsList.addEventListener('dragend', (e) => {
+                const draggedEl = poemsList.querySelector('.poem-item.dragging');
+                if (draggedEl) {
+                    draggedEl.classList.remove('dragging');
+                }
+                this.draggedIndex = null; // Reset
+                console.log('Drag ended. draggedIndex reset.');
+            });
+            console.log('Drag and drop listeners added to poem list.');
         }
 
-        /**
-         * Reorders poems by moving a poem from one index to another.
-         * @param {number} fromIndex - The original index of the poem.
-         * @param {number} toIndex - The target index for the poem.
-         */
-        reorderPoems(fromIndex, toIndex) {
-            const poem = this.poems.splice(fromIndex, 1)[0];
-            this.poems.splice(toIndex, 0, poem);
-            this.updateDisplay();
-            this.showNotification('Poems reordered!', 'info');
-        }
 
         /**
-         * Removes a poem at the specified index.
-         * @param {number} index - The index of the poem to remove.
+         * Removes a poem from the list by its ID.
+         * @param {string} id - The ID of the poem to remove.
          */
-        removePoem(index) {
-            if (index >= 0 && index < this.poems.length) {
-                const removedPoem = this.poems.splice(index, 1)[0];
+        removePoem(id) {
+            console.log('Attempting to remove poem with ID:', id);
+            const initialCount = this.poems.length;
+            this.poems = this.poems.filter(poem => poem.id != id); // Use != for loose comparison with dataset.id (string)
+            if (this.poems.length < initialCount) {
+                this.showNotification('Poem removed!', 'success');
+                this.announceToScreenReader('poem-list-status', 'Poem removed.');
                 this.updateDisplay();
-                this.showNotification(`Removed "${removedPoem.title}"`, 'info');
-                this.announceToScreenReader('process-status', `Poem "${removedPoem.title}" removed`);
+                console.log('Poem removed successfully. Remaining poems:', this.poems.length);
+            } else {
+                console.warn('Poem with ID not found:', id);
             }
         }
 
         /**
-         * Downloads all poems as a combined Word document.
+         * Displays a poem's content in a modal.
+         * @param {string} id - The ID of the poem to view.
          */
-        async downloadCombinedDocument() {
+        viewPoem(id) {
+            console.log('Viewing poem with ID:', id);
+            const poem = this.poems.find(p => p.id == id);
+            if (poem) {
+                const modal = document.getElementById('poemModal');
+                const modalTitle = document.getElementById('poemModalTitle');
+                const modalContent = document.getElementById('poemModalContent');
+                const closeModalBtn = document.getElementById('closeModal');
+
+                if (!modal || !modalTitle || !modalContent || !closeModalBtn) {
+                    console.error('Modal elements not found.');
+                    this.showNotification('Error: Modal display elements missing.', 'error');
+                    return;
+                }
+
+                modalTitle.textContent = poem.title;
+                // Use innerHTML to preserve formatting from Mammoth.js
+                modalContent.innerHTML = poem.htmlContent;
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                modal.focus(); // Focus the modal for accessibility
+
+                closeModalBtn.onclick = () => {
+                    modal.classList.add('hidden');
+                    modal.setAttribute('aria-hidden', 'true');
+                    // Return focus to the button that opened the modal if possible
+                    document.querySelector(`button[data-id="${id}"]`)?.focus();
+                };
+
+                // Close modal on escape key
+                const handleEscape = (e) => {
+                    if (e.key === 'Escape') {
+                        closeModalBtn.click();
+                        document.removeEventListener('keydown', handleEscape);
+                    }
+                };
+                document.addEventListener('keydown', handleEscape);
+
+                console.log(`Modal opened for "${poem.title}".`);
+            } else {
+                this.showNotification('Poem not found.', 'error');
+                console.warn('Attempted to view non-existent poem ID:', id);
+            }
+        }
+
+        /**
+         * Combines all loaded poems into a single HTML document and triggers a download.
+         */
+        downloadCombinedDocument() {
             if (this.poems.length === 0) {
                 this.showNotification('No poems to download!', 'warning');
+                console.warn('Download attempted with no poems.');
                 return;
             }
 
-            try {
-                let combinedHtml = `
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <title>Combined Poems</title>
-                        <style>
-                            body { font-family: 'Times New Roman', serif; line-height: 1.6; margin: 40px; }
-                            .poem { margin-bottom: 50px; page-break-after: auto; }
-                            .poem-title { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 20px; }
-                            .poem-content { white-space: pre-wrap; }
-                            .page-break { page-break-before: always; }
-                        </style>
-                    </head>
-                    <body>
-                `;
+            console.log('Preparing combined document for download.');
+            let combinedHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combined Poems</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 2em auto; padding: 0 1em; color: #333; }
+        h1, h2, h3 { color: #2c3e50; margin-top: 1.5em; margin-bottom: 0.5em; }
+        h1 { font-size: 2.2em; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 0.5em; }
+        h2 { font-size: 1.8em; }
+        h3 { font-size: 1.4em; }
+        .poem-section { margin-bottom: 2em; padding-bottom: 1em; border-bottom: 1px dashed #eee; }
+        .poem-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        p { margin-bottom: 0.5em; }
+        .poem-metadata { font-size: 0.9em; color: #777; margin-top: -0.5em; margin-bottom: 1em; }
+        pre { background-color: #f4f4f4; padding: 1em; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+        /* Preserve line breaks for poetry if not already in paragraphs */
+        .poem-content { white-space: pre-wrap; } 
+    </style>
+</head>
+<body>
+    <h1>Combined Poems</h1>
+    <div class="poems-container">
+`;
 
-                this.poems.forEach((poem, index) => {
-                    if (index > 0) {
-                        combinedHtml += '<div class="page-break"></div>';
-                    }
-                    combinedHtml += `
-                        <div class="poem">
-                            <div class="poem-title">${this.escapeHtml(poem.title)}</div>
-                            <div class="poem-content">${poem.htmlContent || this.escapeHtml(poem.content)}</div>
-                        </div>
-                    `;
-                });
+            this.poems.forEach(poem => {
+                combinedHtml += `
+        <div class="poem-section">
+            <h2>${this.escapeHtml(poem.title)}</h2>
+            <p class="poem-metadata"><em>From: ${this.escapeHtml(poem.filename)} | Words: ${poem.wordCount}</em></p>
+            <div class="poem-content">
+                ${poem.htmlContent}
+            </div>
+        </div>
+`;
+            });
 
-                combinedHtml += '</body></html>';
+            combinedHtml += `
+    </div>
+</body>
+</html>`;
 
-                const blob = new Blob([combinedHtml], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `combined-poems-${new Date().toISOString().split('T')[0]}.docx`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                this.showNotification(`Downloaded ${this.poems.length} poems successfully!`, 'success');
-                this.announceToScreenReader('process-status', `${this.poems.length} poems downloaded`);
-
-            } catch (error) {
-                console.error('Error creating download:', error);
-                this.showNotification('Error creating download: ' + error.message, 'error');
-            }
+            const blob = new Blob([combinedHtml], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Combined_Poems.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.showNotification('Combined document downloaded!', 'success');
+            this.announceToScreenReader('process-status', 'Combined document downloaded.');
+            console.log('Combined document download initiated.');
         }
 
         /**
-         * Escapes HTML characters to prevent XSS attacks.
-         * @param {string} text - The text to escape.
-         * @returns {string} The escaped text.
-         */
-        escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        /**
-         * Shows a notification message to the user.
+         * Displays a temporary notification message to the user.
          * @param {string} message - The message to display.
-         * @param {string} type - The type of notification (success, error, warning, info).
-         * @param {number} duration - How long to show the notification in milliseconds (default: 5000).
+         * @param {string} type - The type of notification (e.g., 'success', 'error', 'info', 'warning').
+         * @param {number} [duration=5000] - How long the notification should be visible in milliseconds.
          */
-        showNotification(message, type = 'info', duration = 5000) {
-            if (this.notificationTimeout) {
-                clearTimeout(this.notificationTimeout);
-            }
-
+        showNotification(message, type, duration = 5000) {
             const notification = document.getElementById('notification');
             if (!notification) {
-                console.warn('Notification element not found.');
+                console.error('Notification element not found.');
                 return;
+            }
+
+            // Clear any existing timeout to prevent rapid notifications from hiding too quickly
+            if (this.notificationTimeout) {
+                clearTimeout(this.notificationTimeout);
+                this.notificationTimeout = null;
             }
 
             notification.textContent = message;
-            notification.className = `notification ${type} show`;
+            notification.className = `notification fixed bottom-4 right-4 p-3 rounded-md shadow-lg text-white opacity-0 transition-opacity duration-300 z-50`;
 
-            if (duration > 0) {
-                this.notificationTimeout = setTimeout(() => {
-                    notification.classList.remove('show');
-                }, duration);
+            switch (type) {
+                case 'success':
+                    notification.classList.add('bg-green-500');
+                    break;
+                case 'error':
+                    notification.classList.add('bg-red-500');
+                    break;
+                case 'info':
+                    notification.classList.add('bg-blue-500');
+                    break;
+                case 'warning':
+                    notification.classList.add('bg-yellow-500');
+                    notification.classList.add('text-gray-900'); // Ensure text is visible on yellow
+                    break;
+                default:
+                    notification.classList.add('bg-gray-700');
+            }
+
+            // Show notification
+            requestAnimationFrame(() => {
+                notification.classList.remove('opacity-0');
+                notification.classList.add('opacity-100');
+            });
+
+            // Hide after duration
+            this.notificationTimeout = setTimeout(() => {
+                notification.classList.remove('opacity-100');
+                notification.classList.add('opacity-0');
+                this.notificationTimeout = null;
+            }, duration);
+
+            console.log(`Notification: ${message} (${type})`);
+        }
+
+        /**
+         * Announces messages to screen readers using an ARIA live region.
+         * @param {string} regionId - The ID of the live region element.
+         * @param {string} message - The message to announce.
+         */
+        announceToScreenReader(regionId, message) {
+            const liveRegion = document.getElementById(regionId);
+            if (liveRegion) {
+                liveRegion.textContent = message;
+                console.log(`Announced to screen reader (${regionId}): ${message}`);
+            } else {
+                console.warn(`ARIA live region with ID "${regionId}" not found.`);
             }
         }
 
         /**
-         * Announces messages to screen readers for accessibility.
-         * @param {string} ariaLiveId - The ID of the aria-live element.
-         * @param {string} message - The message to announce.
+         * Escapes HTML entities in a string to prevent XSS.
+         * @param {string} str - The string to escape.
+         * @returns {string} The escaped string.
          */
-        announceToScreenReader(ariaLiveId, message) {
-            const ariaLive = document.getElementById(ariaLiveId);
-            if (ariaLive) {
-                ariaLive.textContent = message;
-                setTimeout(() => {
-                    ariaLive.textContent = '';
-                }, 3000);
-            }
+        escapeHtml(str) {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
         }
     }
 
-    // Initialize the application when the DOM is fully loaded
+    // Initialize the PoemCompiler once the DOM is fully loaded
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM loaded, initializing PoemCompiler...');
+        console.log('DOM Content Loaded. Initializing PoemCompiler.');
         new PoemCompiler();
     });
-
 })();
