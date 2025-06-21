@@ -1049,14 +1049,15 @@
                         filename += '.html';
                         break;
                     case 'docx':
-                        // Changed MIME type and extension for better compatibility with Word for HTML content
-                        blob = new Blob([combinedHtml], { type: 'application/msword' });
-                        filename += '.doc'; // Use .doc extension
-                        this.showNotification('Downloading as .doc. This is an HTML file saved with a .doc extension for compatibility with Word. Formatting may vary. For full .docx features, open in Word and Save As .docx.', 'info', 10000);
+                        // Generate MHTML for better Word compatibility
+                        const mhtmlContent = this._generateMhtmlContentForExport(combinedHtml);
+                        blob = new Blob([mhtmlContent], { type: 'application/x-mimearchive' });
+                        filename += '.mht'; // Use .mht extension for MHTML
+                        this.showNotification('Downloading as .mht (Web Archive). This format offers better compatibility with Word for HTML content. You may need to "Save As" .docx in Word for full features.', 'info', 10000);
                         break;
                     case 'pdf':
                         console.log('Generating PDF...');
-                        console.log('HTML content for PDF:', combinedHtml.substring(0, 500) + '...'); // Log first 500 chars
+                        console.log('HTML content for PDF:', combinedHtml.substring(0, 500) + '...');
                         await this._generatePdfOutput(combinedHtml, filename);
                         this.showNotification('PDF generated!', 'success');
                         this.resetDownloadUI(downloadBtn, originalText);
@@ -1213,6 +1214,49 @@
         }
 
         /**
+         * Generates MHTML content from an HTML string for better Word compatibility.
+         * @param {string} htmlContent - The HTML string to convert to MHTML.
+         * @returns {string} The MHTML string.
+         */
+        _generateMhtmlContentForExport(htmlContent) {
+            const boundary = `----=_NextPart_${Math.random().toString().slice(2)}`;
+            let mhtml = `MIME-Version: 1.0\n`;
+            mhtml += `Content-Type: multipart/related; boundary="${boundary}"\n\n`;
+
+            mhtml += `--${boundary}\n`;
+            mhtml += `Content-Type: text/html; charset="utf-8"\n`;
+            mhtml += `Content-Transfer-Encoding: quoted-printable\n`;
+            mhtml += `Content-Location: about:blank\n\n`; // Or a more descriptive base URL
+
+            // Quoted-printable encode the HTML content
+            mhtml += this._quotedPrintableEncode(htmlContent) + '\n\n';
+
+            // If there were images or other linked resources, they would go here
+            // as additional parts with their own headers (Content-Location, Content-Type, etc.)
+
+            mhtml += `--${boundary}--`;
+            return mhtml;
+        }
+
+        /**
+         * Simple quoted-printable encoder (basic implementation, might need more robust for complex HTML)
+         * @param {string} str - The string to encode.
+         * @returns {string} The quoted-printable encoded string.
+         */
+        _quotedPrintableEncode(str) {
+            // Basic encoding for common characters that need it
+            // A full implementation would be more complex, but this covers most text cases.
+            return str.replace(/=/g, '=3D')
+                      .replace(/\?/g, '=3F')
+                      .replace(/_/g, '=5F')
+                      .replace(/\r?\n/g, '=\r\n') // Soft line breaks
+                      .replace(/[\x00-\x1F\x7F-\xFF]/g, (char) => {
+                          const byte = char.charCodeAt(0);
+                          return '=' + byte.toString(16).toUpperCase().padStart(2, '0');
+                      });
+        }
+
+        /**
          * Generates and downloads a PDF document from the given HTML content.
          * @param {string} htmlContent - The HTML string to convert to PDF.
          * @param {string} filename - The desired filename for the PDF.
@@ -1230,12 +1274,12 @@
             tempDiv.innerHTML = htmlContent;
             tempDiv.style.width = '210mm';
             tempDiv.style.margin = '0 auto';
-            tempDiv.style.visibility = 'hidden'; // Keep it hidden
+            tempDiv.style.visibility = 'hidden';
             document.body.appendChild(tempDiv);
             console.log('Temporary div created and appended for PDF generation.');
 
-            // Add a small delay to ensure the browser has time to render content in tempDiv
-            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+            // Increased delay to 500ms
+            await new Promise(resolve => setTimeout(resolve, 500));
 
             try {
                 await html2pdf().set(opt).from(tempDiv).save();
