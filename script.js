@@ -331,7 +331,10 @@
                 const arrayBuffer = await file.arrayBuffer();
                 console.log(`File "${file.name}" converted to ArrayBuffer.`);
                 const result = await window.mammoth.convertToHtml({ arrayBuffer });
-                console.log(`Mammoth conversion result for "${file.name}":`, result);
+
+                // --- START OF DEBUGGING LINE FOR IMAGE ISSUE ---
+                console.log(`Mammoth.js RAW HTML output for "${file.name}":`, result.value);
+                // --- END OF DEBUGGING LINE ---
 
                 if (!result.value) {
                     console.warn(`Mammoth returned no HTML content for "${file.name}".`);
@@ -344,23 +347,25 @@
                 const fullContent = tempDiv.textContent.trim();
                 console.log(`Full plain text content length for "${file.name}": ${fullContent.length}`);
 
-                if (!fullContent || fullContent.length < 10) {
+                if (!fullContent || fullContent.length < 50) { // Increased minimum length for the whole document
                     console.warn(`Document "${file.name}" appears empty or too short after extraction.`);
                     throw new Error('Document appears to be empty or too short after extraction.');
                 }
 
-                const poems = this.identifyMultiplePoems(tempDiv, file.name, html);
-                console.log(`identifyMultiplePoems returned ${poems.length} poems for "${file.name}".`);
+                // Attempt to identify multiple poems
+                const identifiedPoems = this.identifyMultiplePoems(tempDiv, file.name, html);
+                console.log(`identifyMultiplePoems returned ${identifiedPoems.length} poems for "${file.name}".`);
 
-                // If multiple poem detection yields 0 or 1 poem, treat the whole document as one.
-                // This is crucial for handling unusually formatted single poems that might otherwise be fragmented.
-                if (poems.length <= 1) {
+                // Crucial Fallback: If multiple poem detection yields 0 or 1 *meaningful* poem,
+                // treat the whole document as one. This handles unusually formatted single poems.
+                // A "meaningful" poem for this check means substantial content.
+                if (identifiedPoems.length <= 1 || (identifiedPoems.length > 1 && identifiedPoems.every(p => p.content.length < 100))) {
                     const singlePoem = this.createSinglePoemFromDocument(tempDiv, file.name, html, fullContent);
-                    console.log(`Multi-poem detection found ${poems.length} poems. Treating "${file.name}" as a single poem: "${singlePoem.title}".`);
+                    console.log(`Multi-poem detection found ${identifiedPoems.length} potential segments. Treating "${file.name}" as a single poem: "${singlePoem.title}".`);
                     return [singlePoem];
                 }
 
-                return poems;
+                return identifiedPoems;
 
             } catch (error) {
                 console.error(`Failed to extract content from "${file.name}":`, error);
@@ -370,7 +375,7 @@
 
         /**
          * Attempts to identify and separate multiple poems within an HTML document structure.
-         * Uses different strategies (headings, paragraph breaks, separators).
+         * Uses different strategies (headings, paragraph breaks, explicit separators).
          * @param {HTMLElement} tempDiv - A temporary div containing the document's HTML.
          * @param {string} filename - The original filename.
          * @param {string} fullHtml - The full HTML content from Mammoth.js.
@@ -378,61 +383,69 @@
          */
         identifyMultiplePoems(tempDiv, filename, fullHtml) {
             console.log(`Starting identifyMultiplePoems for "${filename}".`);
-            let identifiedPoems = [];
+            let poems = [];
+            const MIN_CONTENT_LENGTH_FOR_SPLIT = 100; // A segment must have at least this many chars to be a distinct poem
 
             // Strategy 1: Split by headings (H1, H2, H3)
             const headings = tempDiv.querySelectorAll('h1, h2, h3');
             if (headings.length > 1) {
                 const poemsByHeadings = this.extractPoemsByHeadings(tempDiv, filename, headings);
-                if (poemsByHeadings.length > 1) {
+                // Only consider this a successful multi-poem split if at least two poems are substantial
+                if (poemsByHeadings.filter(p => p.content.length >= MIN_CONTENT_LENGTH_FOR_SPLIT).length > 1) {
                     console.log(`Strategy 1 (Headings) found ${poemsByHeadings.length} poems.`);
-                    identifiedPoems = poemsByHeadings;
+                    return poemsByHeadings;
+                } else {
+                    console.log(`Strategy 1 (Headings) found segments, but not enough substantial ones to confirm multiple poems.`);
                 }
             }
 
-            // If headings didn't provide multiple distinct poems, try other strategies.
-            // We want to avoid false positives if headings were present but not truly separating poems.
-            if (identifiedPoems.length <= 1) {
-                // Strategy 2: Split by multiple line breaks or page breaks (empty paragraphs)
-                // We'll iterate through child nodes instead of just paragraphs to capture mixed content
-                const paragraphs = Array.from(tempDiv.querySelectorAll('p'));
-                if (paragraphs.length > 3) { // Ensure there are enough paragraphs to consider separation
-                    const poemsByParagraphs = this.extractPoemsByParagraphSeparation(tempDiv, filename, paragraphs);
-                    if (poemsByParagraphs.length > 1) {
-                        console.log(`Strategy 2 (Paragraph Separation) found ${poemsByParagraphs.length} poems.`);
-                        identifiedPoems = poemsByParagraphs;
-                    }
-                }
-            }
+            // Strategy 2: Split by explicit patterns like "***", "---", or multiple empty paragraphs
+            const separatorPatterns = [
+                /\n\s*\*{3,}\s*\n/g, // ***
+                /\n\s*-{3,}\s*\n/g, // ---
+                /\n\s*_{3,}\s*\n/g, // ___
+                /\n\s*={3,}\s*\n/g, // ===
+                /\n\s*~{3,}\s*\n/g, // ~~~
+                /(<p>\s*&nbsp;\s*<\/p>){2,}/g, // Two or more empty paragraphs with &nbsp;
+                /(<p>\s*<\/p>){2,}/g // Two or more empty paragraphs
+            ];
 
-            // If still no distinct poems, try explicit separators.
-            if (identifiedPoems.length <= 1) {
-                // Strategy 3: Split by patterns like "***", "---", or similar visual separators
-                const separatorPatterns = [
-                    /\n\s*\*{3,}\s*\n/g, // ***
-                    /\n\s*-{3,}\s*\n/g, // ---
-                    /\n\s*_{3,}\s*\n/g, // ___
-                    /\n\s*={3,}\s*\n/g, // ===
-                    /\n\s*~{3,}\s*\n/g, // ~~~
-                    /(<p>\s*&nbsp;\s*<\/p>){2,}/g, // Multiple empty paragraphs (mammoth often produces &nbsp;)
-                    /(<p>\s*<\/p>){2,}/g // Multiple empty paragraphs
-                ];
-
-                for (const pattern of separatorPatterns) {
+            for (const pattern of separatorPatterns) {
+                // Ensure the pattern actually exists and splits the content into more than one part
+                if (fullHtml.match(pattern)) {
                     const partsHtml = fullHtml.split(pattern);
-                    if (partsHtml.length > 1) {
-                        const poemsBySeparator = this.extractPoemsBySeparator(partsHtml, filename);
+                    // Filter out very short or empty parts that might just be separator artifacts
+                    const meaningfulParts = partsHtml.filter(part => {
+                        const tempPartDiv = document.createElement('div');
+                        tempPartDiv.innerHTML = part;
+                        return tempPartDiv.textContent.trim().length >= MIN_CONTENT_LENGTH_FOR_SPLIT;
+                    });
+
+                    if (meaningfulParts.length > 1) {
+                        const poemsBySeparator = this.extractPoemsBySeparator(meaningfulParts, filename);
                         if (poemsBySeparator.length > 1) {
-                            console.log(`Strategy 3 (Separators: ${pattern}) found ${poemsBySeparator.length} poems.`);
-                            identifiedPoems = poemsBySeparator;
-                            break; // Stop after the first successful separator strategy
+                            console.log(`Strategy 2 (Separators: ${pattern}) found ${poemsBySeparator.length} poems.`);
+                            return poemsBySeparator; // Return early if a clear separator is found
                         }
                     }
                 }
             }
 
-            console.log(`Final identified poems count for "${filename}": ${identifiedPoems.length}.`);
-            return identifiedPoems;
+            // Strategy 3: Split by significant paragraph breaks (very conservative)
+            // This is the most ambiguous strategy, so it should be the last resort and very strict.
+            const paragraphs = Array.from(tempDiv.querySelectorAll('p'));
+            if (paragraphs.length > 3) { // Need a good number of paragraphs to consider this
+                const poemsByParagraphs = this.extractPoemsByParagraphSeparation(tempDiv, filename, paragraphs);
+                 if (poemsByParagraphs.filter(p => p.content.length >= MIN_CONTENT_LENGTH_FOR_SPLIT).length > 1) {
+                    console.log(`Strategy 3 (Paragraph Separation) found ${poemsByParagraphs.length} poems.`);
+                    return poemsByParagraphs;
+                } else {
+                    console.log(`Strategy 3 (Paragraph Separation) found segments, but not enough substantial ones to confirm multiple poems.`);
+                }
+            }
+
+            console.log(`No strong multi-poem separation detected for "${filename}".`);
+            return []; // Return empty, which will trigger the single-poem fallback
         }
 
         /**
@@ -446,15 +459,16 @@
             const poems = [];
             const allElements = Array.from(tempDiv.children);
             console.log(`  Extracting by headings for "${filename}". Found ${headings.length} headings.`);
+            const MIN_POEM_LENGTH_HEADING = 50; // Minimum characters for a poem section identified by heading
 
             for (let i = 0; i < headings.length; i++) {
                 const currentHeading = headings[i];
                 const nextHeading = headings[i + 1];
 
                 const title = currentHeading.textContent.trim();
-                // Ensure heading is meaningful, not just a short artifact
-                if (title.length === 0 || title.length > 200) {
-                    console.log(`    Skipping heading with invalid title length: "${title}"`);
+                // Ensure heading is meaningful
+                if (title.length === 0 || title.length > 200 || title.split(/\s+/).length > 20) { // Max 20 words for a title
+                    console.log(`    Skipping heading with invalid title: "${title}"`);
                     continue;
                 }
 
@@ -467,7 +481,8 @@
                 // Filter out any empty text nodes or very short paragraphs that might be artifacts
                 const meaningfulElements = poemElements.filter(el => {
                     // Check if element has actual content or is a line break (<br>) or non-empty paragraph
-                    return el.textContent.trim().length > 0 || el.tagName === 'BR' || (el.tagName === 'P' && el.innerHTML.trim() !== '&nbsp;' && el.innerHTML.trim() !== '');
+                    // Consider content beyond just whitespace or &nbsp;
+                    return el.textContent.trim().length > 0 || (el.tagName === 'P' && el.innerHTML.trim() !== '&nbsp;' && el.innerHTML.trim() !== '');
                 });
 
                 if (meaningfulElements.length === 0) {
@@ -478,25 +493,27 @@
                 // Preserve the structure and formatting as much as possible for htmlContent
                 const poemHtml = meaningfulElements.map(el => el.outerHTML).join('\n');
                 const poemContent = meaningfulElements.map(el => {
+                    // Convert <br> to newline, otherwise use textContent.
+                    // This is for plain text content for word count and duplication check.
                     return el.tagName === 'BR' ? '\n' : el.textContent;
                 }).join('\n').trim();
 
                 // Add the heading itself to the poem's htmlContent to retain its styling
                 const fullPoemHtml = currentHeading.outerHTML + '\n' + poemHtml;
 
-                if (poemContent.length > 50) { // Ensure there's substantial content for a poem
+                if (poemContent.length >= MIN_POEM_LENGTH_HEADING) {
                     poems.push(this.createPoemObject(title, poemContent, fullPoemHtml, filename));
                 } else {
                     console.log(`    Skipping heading "${title}" due to insufficient content (${poemContent.length} chars).`);
                 }
             }
             console.log(`  Finished heading extraction. Found ${poems.length} poems.`);
-            return poems; // Return all found, let identifyMultiplePoems decide if it's > 1
+            return poems;
         }
 
         /**
          * Extracts poems by identifying blocks of paragraphs separated by empty or very short paragraphs.
-         * Attempts to infer titles from the first paragraph of a new block if it fits title criteria.
+         * This strategy is now very conservative.
          * @param {HTMLElement} tempDiv - The temporary div containing the document HTML.
          * @param {string} filename - The name of the original file.
          * @param {NodeList<HTMLElement>} paragraphs - A NodeList of paragraph elements.
@@ -508,40 +525,48 @@
             let currentTitle = '';
             let poemIndex = 1;
             console.log(`  Extracting by paragraph separation for "${filename}". Found ${paragraphs.length} paragraphs.`);
+            const MIN_POEM_LENGTH_PARA_SPLIT = 150; // Higher minimum for this ambiguous splitting method
 
             for (let i = 0; i < paragraphs.length; i++) {
                 const p = paragraphs[i];
                 const text = p.textContent.trim();
                 const html = p.outerHTML;
 
+                // A much stricter heuristic for a "significant break" that indicates a new poem.
+                // Require a truly empty paragraph or a paragraph with only non-breaking spaces,
+                // OR at least two consecutive empty-like paragraphs.
+                const isTrulyEmpty = text.length === 0 || p.innerHTML.trim() === '&nbsp;' || p.innerHTML.trim() === '<br>' || p.innerHTML.trim() === '<br />';
+                const isSignificantBreak = isTrulyEmpty && (
+                    (i + 1 < paragraphs.length && (paragraphs[i + 1].textContent.trim().length === 0 || paragraphs[i + 1].innerHTML.trim() === '&nbsp;')) ||
+                    (i + 2 < paragraphs.length && (paragraphs[i + 2].textContent.trim().length === 0 || paragraphs[i + 2].innerHTML.trim() === '&nbsp;'))
+                );
+
                 // Heuristic for what might be a title: short, possibly bold/centered, starts with a capital letter
-                // Be more conservative: must be short AND either bold, centered, or ALL CAPS
+                // Be very conservative: must be short AND either bold, centered, or ALL CAPS
                 const mightBeTitle = text.length > 0 && text.length < 100 &&
-                    (p.querySelector('strong, b') || p.style.textAlign === 'center' || (text === text.toUpperCase() && text.length < 50));
+                    (p.querySelector('strong, b') || p.style.textAlign === 'center' || (text === text.toUpperCase() && text.length < 50 && text.split(/\s+/).length < 10)); // Max 10 words for an ALL CAPS title
 
-                // Heuristic for an empty line or a significant break: truly empty paragraph or multiple <br>s
-                const isEmptyOrBreak = text.length === 0 || p.innerHTML.trim() === '&nbsp;' || p.innerHTML.trim() === '<br>' || p.innerHTML.trim() === '<br />' || (text.length < 5 && p.children.length === 0);
-
-                if (isEmptyOrBreak) {
+                if (isSignificantBreak) {
                     if (currentPoemElements.length > 0) {
                         const poemContent = currentPoemElements.map(el => el.textContent).join('\n').trim();
                         const poemHtml = currentPoemElements.map(el => el.outerHTML).join('\n');
                         const title = currentTitle || `Poem ${poemIndex} from ${filename}`;
 
-                        if (poemContent.length > 50) { // Ensure there's substantial content
+                        if (poemContent.length >= MIN_POEM_LENGTH_PARA_SPLIT) { // Ensure substantial content
                             poems.push(this.createPoemObject(title, poemContent, poemHtml, filename));
                             poemIndex++;
-                            console.log(`    Poem #${poemIndex - 1} identified by paragraph break: "${title}"`);
+                            console.log(`    Poem #${poemIndex - 1} identified by significant paragraph break: "${title}"`);
                         } else {
-                            console.log(`    Skipping short poem segment before break (length: ${poemContent.length}).`);
+                            console.log(`    Skipping short poem segment before break (length: ${poemContent.length}). Likely part of previous/next.`);
                         }
                         currentPoemElements = [];
                         currentTitle = '';
                     }
-                    // If multiple empty paragraphs, consider it a strong separator, do not add the empty p to content
+                    // Skip the actual empty/break paragraphs from being added to any poem's content
                 } else if (mightBeTitle && currentPoemElements.length === 0) {
+                    // If it's a potential title and no current poem content, start a new one
                     currentTitle = text;
-                    currentPoemElements.push(p); // Add this potential title paragraph to the current poem elements
+                    currentPoemElements.push(p);
                     console.log(`    Potential title detected: "${text}"`);
                 } else {
                     currentPoemElements.push(p);
@@ -554,11 +579,11 @@
                 const poemHtml = currentPoemElements.map(el => el.outerHTML).join('\n');
                 const title = currentTitle || `Poem ${poemIndex} from ${filename}`;
 
-                if (poemContent.length > 50) {
+                if (poemContent.length >= MIN_POEM_LENGTH_PARA_SPLIT) {
                     poems.push(this.createPoemObject(title, poemContent, poemHtml, filename));
                     console.log(`    Last poem identified: "${title}"`);
                 } else {
-                    console.log(`    Skipping last poem segment due to insufficient content (length: ${poemContent.length}).`);
+                    console.log(`    Skipping last poem segment due to insufficient content (length: ${poemContent.length}). Likely part of previous/next.`);
                 }
             }
             console.log(`  Finished paragraph separation. Found ${poems.length} poems.`);
@@ -566,7 +591,7 @@
         }
 
         /**
-         * Extracts poems by splitting the HTML content based on detected separator patterns.
+         * Extracts poems by identifying blocks of HTML content based on detected separator patterns.
          * @param {Array<string>} htmlParts - Array of HTML strings separated by a pattern.
          * @param {string} filename - The name of the original file.
          * @returns {Array<Object>} An array of poem objects.
@@ -574,13 +599,15 @@
         extractPoemsBySeparator(htmlParts, filename) {
             const poems = [];
             console.log(`  Extracting by custom separators for "${filename}". Found ${htmlParts.length} parts.`);
+            const MIN_POEM_LENGTH_SEPARATOR = 50; // Minimum characters for a poem section identified by separator
+
             htmlParts.forEach((part, index) => {
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = part.trim();
                 const content = tempDiv.textContent.trim();
 
                 // If the part is just the separator itself or very short, skip it
-                if (content.length < 50 && !tempDiv.querySelector('p')) { // Also check if it contains actual paragraphs
+                if (content.length < MIN_POEM_LENGTH_SEPARATOR && !tempDiv.querySelector('p, h1, h2, h3, h4, h5, h6, pre')) {
                     console.log(`    Skipping part ${index + 1} due to insufficient content after separator.`);
                     return;
                 }
@@ -615,7 +642,7 @@
                     }
                 }
 
-                if (content.length > 50) { // Ensure poem has substantial content
+                if (content.length >= MIN_POEM_LENGTH_SEPARATOR) {
                     poems.push(this.createPoemObject(title, content, part.trim(), filename));
                     console.log(`    Poem #${index + 1} identified by separator: "${title}"`);
                 } else {
@@ -686,7 +713,8 @@
             const headings = tempDiv.querySelectorAll('h1, h2, h3');
             for (let i = 0; i < headings.length; i++) {
                 const hText = headings[i].textContent.trim();
-                if (hText.length > 0 && hText.length < 150) {
+                // Ensure heading is meaningful (not too short/long, not just numbers etc)
+                if (hText.length > 0 && hText.length < 150 && hText.split(/\s+/).length < 25 && /[a-zA-Z]/.test(hText)) {
                     title = hText;
                     console.log(`  Title found from heading: "${title}"`);
                     break;
@@ -702,10 +730,11 @@
                     if (pText.length > 0 && pText.length < 150) {
                         const isBold = p.querySelector('strong, b') !== null;
                         const isCentered = p.style.textAlign === 'center';
+                        const isAllCaps = pText === pText.toUpperCase() && pText.length < 50 && pText.split(/\s+/).length < 10;
 
-                        if (isBold || isCentered) {
+                        if (isBold || isCentered || isAllCaps) {
                             title = pText;
-                            console.log(`  Title found from bold/centered paragraph: "${title}"`);
+                            console.log(`  Title found from bold/centered/all caps paragraph: "${title}"`);
                             break;
                         }
                     }
@@ -716,12 +745,15 @@
             if (!title) {
                 const paragraphs = tempDiv.querySelectorAll('p');
                 if (paragraphs.length > 0) {
-                    const firstParagraphText = paragraphs[0].textContent.trim();
-                    if (firstParagraphText.length > 0) {
-                        const firstLine = firstParagraphText.split('\n')[0].trim();
-                        if (firstLine.length > 0 && firstLine.length < 150) {
-                            title = firstLine;
-                            console.log(`  Title found from first line of first paragraph: "${title}"`);
+                    const firstMeaningfulParagraph = Array.from(paragraphs).find(p => p.textContent.trim().length > 0);
+                    if (firstMeaningfulParagraph) {
+                        const firstParagraphText = firstMeaningfulParagraph.textContent.trim();
+                        if (firstParagraphText.length > 0) {
+                            const firstLine = firstParagraphText.split('\n')[0].trim();
+                            if (firstLine.length > 0 && firstLine.length < 150 && firstLine.split(/\s+/).length < 25) {
+                                title = firstLine;
+                                console.log(`  Title found from first line of first meaningful paragraph: "${title}"`);
+                            }
                         }
                     }
                 }
@@ -730,6 +762,13 @@
             if (!title) {
                 title = filename.replace(/\.docx$/i, '').replace(/[_-]/g, ' ').trim();
                 console.log(`  Title falling back to cleaned filename: "${title}"`);
+            }
+
+            // Capitalize first letter of fallback titles for better display
+            if (title.startsWith('poem ') && title.toLowerCase().includes('from')) {
+                 // Leave "Poem X from file" as is
+            } else if (title.length > 0) {
+                title = title.charAt(0).toUpperCase() + title.slice(1);
             }
 
             return title;
@@ -750,7 +789,6 @@
 
             if (!poemsList || !downloadBtn || !clearBtn || !placeholder || !poemCountSpan) {
                 console.error('Required DOM elements for display update not found. Ensure all IDs are correct in HTML.');
-                // Do not show notification here as it might also fail if notification element is missing
                 return;
             }
 
@@ -1081,9 +1119,8 @@
             content: "";
             margin-top: 0.5em; /* Adds vertical space for line breaks */
         }
-        .poem-metadata { font-size: 0.9em; color: #777; margin-top: -0.5em; margin-bottom: 1em; }
-        strong, b { font-weight: bold; }
-        em, i { font-style: italic; }
+        .poem-content pre { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; }
+        .poem-content code { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; }
         /* Basic alignment from Mammoth.js output */
         p[align="center"] { text-align: center; }
         p[align="right"] { text-align: right; }
@@ -1092,6 +1129,8 @@
         .poem-content code { white-space: pre-wrap; word-wrap: break-word; }
         /* Ensure other block elements like div maintain spacing */
         .poem-content > div { margin-bottom: 0.5em; }
+        /* Basic image styling */
+        .poem-content img { max-width: 100%; height: auto; display: block; margin: 0.5em auto; }
     </style>
 </head>
 <body>
